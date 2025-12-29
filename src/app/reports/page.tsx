@@ -177,7 +177,7 @@ export default function ReportsPage() {
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList>
               <TabsTrigger value="summary">Summary</TabsTrigger>
-              <TabsTrigger value="hierarchy">Account Hierarchy</TabsTrigger>
+              <TabsTrigger value="hierarchy">Balance Sheet</TabsTrigger>
               <TabsTrigger value="time">Time-Based</TabsTrigger>
             </TabsList>
 

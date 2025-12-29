@@ -37,6 +37,7 @@ export interface AccountHierarchyItem {
   total_debits: number;
   total_credits: number;
   balance: number;
+  original_balance?: number; // Balance before adding children
   children?: AccountHierarchyItem[];
 }
 
@@ -217,6 +218,7 @@ export async function getAccountHierarchyReport(
       total_debits: totals.debits,
       total_credits: totals.credits,
       balance,
+      original_balance: balance, // Store original balance before adding children
       children: [],
     };
 
@@ -238,33 +240,8 @@ export async function getAccountHierarchyReport(
     }
   });
 
-  // Calculate parent totals by summing children
-  const calculateParentTotals = (item: AccountHierarchyItem): { debits: number; credits: number; balance: number } => {
-    let childDebits = item.total_debits;
-    let childCredits = item.total_credits;
-    let childBalance = item.balance;
-
-    if (item.children && item.children.length > 0) {
-      item.children.forEach((child) => {
-        const childTotals = calculateParentTotals(child);
-        childDebits += childTotals.debits;
-        childCredits += childTotals.credits;
-        childBalance += childTotals.balance;
-      });
-    }
-
-    // Update item with totals including children
-    item.total_debits = childDebits;
-    item.total_credits = childCredits;
-    item.balance = childBalance;
-
-    return { debits: childDebits, credits: childCredits, balance: childBalance };
-  };
-
-  // Calculate totals for all root accounts and their children
-  rootAccounts.forEach((root) => {
-    calculateParentTotals(root);
-  });
+  // Don't calculate parent totals - keep original balances only
+  // Each account shows only its own transactions, not children
 
   // Sort children
   const sortAccounts = (items: AccountHierarchyItem[]) => {

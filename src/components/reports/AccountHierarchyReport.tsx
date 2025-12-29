@@ -1,7 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { ChevronRightIcon, ChevronDownIcon } from "@radix-ui/react-icons";
 import { useCurrency } from "@/hooks/useCurrency";
 import type { AccountHierarchyItem } from "@/actions/reports";
@@ -12,6 +18,31 @@ interface AccountHierarchyReportProps {
 
 export function AccountHierarchyReport({ data }: AccountHierarchyReportProps) {
   const { format: formatCurrency } = useCurrency();
+
+  // Group accounts by type
+  const accountsByType = useMemo(() => {
+    const grouped: Record<string, AccountHierarchyItem[]> = {
+      asset: [],
+      liability: [],
+      income: [],
+      expense: [],
+    };
+
+    data.forEach((account) => {
+      if (grouped[account.account_type]) {
+        grouped[account.account_type].push(account);
+      }
+    });
+
+    return grouped;
+  }, [data]);
+
+  const typeLabels: Record<string, string> = {
+    asset: "Assets",
+    liability: "Liabilities",
+    income: "Income",
+    expense: "Expenses",
+  };
 
   if (data.length === 0) {
     return (
@@ -25,12 +56,84 @@ export function AccountHierarchyReport({ data }: AccountHierarchyReportProps) {
 
   return (
     <Card className="p-6">
-      <h3 className="text-lg font-semibold mb-4">Account Hierarchy</h3>
-      <div className="space-y-1">
-        {data.map((account) => (
-          <AccountNode key={account.account_id} account={account} />
-        ))}
+      <h3 className="text-lg font-semibold mb-4">Balance Sheet</h3>
+      <div className="space-y-4">
+        {(["asset", "liability", "income", "expense"] as const).map((type) => {
+          const typeAccounts = accountsByType[type];
+          if (typeAccounts.length === 0) return null;
+
+          return (
+            <AccountTypeGroup
+              key={type}
+              type={type}
+              label={typeLabels[type]}
+              accounts={typeAccounts}
+            />
+          );
+        })}
       </div>
+    </Card>
+  );
+}
+
+interface AccountTypeGroupProps {
+  type: "asset" | "liability" | "income" | "expense";
+  label: string;
+  accounts: AccountHierarchyItem[];
+}
+
+function AccountTypeGroup({ type, label, accounts }: AccountTypeGroupProps) {
+  const [isOpen, setIsOpen] = useState(true);
+
+  // Calculate total balance for this type - only accounts at this level, not children
+  const totalBalance = useMemo(() => {
+    return accounts.reduce((sum, account) => {
+      // Use original_balance if available, otherwise use balance (both should be the same now)
+      const accountBalance = account.original_balance !== undefined 
+        ? account.original_balance 
+        : account.balance || 0;
+      return sum + accountBalance;
+    }, 0);
+  }, [accounts]);
+
+  const { format: formatCurrency } = useCurrency();
+
+  return (
+    <Card className="overflow-hidden">
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <CollapsibleTrigger className="w-full">
+          <div className="flex items-center justify-between p-4 hover:bg-accent transition-colors">
+            <div className="flex items-center gap-2">
+              {isOpen ? (
+                <ChevronDownIcon className="w-4 h-4" />
+              ) : (
+                <ChevronRightIcon className="w-4 h-4" />
+              )}
+              <h4 className="text-base font-semibold capitalize">{label}</h4>
+              <Badge variant="outline" className="ml-2">
+                {accounts.length}
+              </Badge>
+            </div>
+            <div className="text-right">
+              <div className="text-xs text-muted-foreground">Total</div>
+              <div
+                className={`text-sm font-semibold ${
+                  totalBalance >= 0 ? "text-primary" : "text-destructive"
+                }`}
+              >
+                {formatCurrency(Math.abs(totalBalance))}
+              </div>
+            </div>
+          </div>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="space-y-1 p-2">
+            {accounts.map((account) => (
+              <AccountNode key={account.account_id} account={account} />
+            ))}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
     </Card>
   );
 }
@@ -81,10 +184,16 @@ function AccountNode({ account }: AccountNodeProps) {
               <div className="text-muted-foreground">Balance</div>
               <div
                 className={`font-semibold ${
-                  account.balance >= 0 ? "text-primary" : "text-destructive"
+                  (account.original_balance !== undefined ? account.original_balance : account.balance) >= 0 
+                    ? "text-primary" 
+                    : "text-destructive"
                 }`}
               >
-                {formatCurrency(Math.abs(account.balance))}
+                {formatCurrency(Math.abs(
+                  account.original_balance !== undefined 
+                    ? account.original_balance 
+                    : account.balance || 0
+                ))}
               </div>
             </div>
           </div>
