@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/select";
 import { useAccounts } from "@/hooks/useAccounts";
 import { useTransactions } from "@/hooks/useTransactions";
+import { toast } from "sonner";
 import { format } from "date-fns";
 import type { Database } from "@/lib/supabase/types";
 
@@ -44,30 +45,30 @@ export function TransferForm({ onSuccess }: TransferFormProps) {
     e.preventDefault();
 
     if (!fromAccountId || !toAccountId || !amount || !description) {
-      alert("Please fill in all required fields");
+      toast.error("Please fill in all required fields");
       return;
     }
 
     if (fromAccountId === toAccountId) {
-      alert("From and To accounts must be different");
+      toast.error("From and To accounts must be different");
       return;
     }
 
     const amountNum = parseFloat(amount);
     if (isNaN(amountNum) || amountNum <= 0) {
-      alert("Please enter a valid amount");
+      toast.error("Please enter a valid amount");
       return;
     }
 
     let feeAmountNum: number | undefined;
     if (hasFee) {
       if (!feeAccountId || !feeAmount) {
-        alert("Please fill in fee details");
+        toast.error("Please fill in fee details");
         return;
       }
       feeAmountNum = parseFloat(feeAmount);
       if (isNaN(feeAmountNum) || feeAmountNum < 0) {
-        alert("Please enter a valid fee amount");
+        toast.error("Please enter a valid fee amount");
         return;
       }
     }
@@ -92,9 +93,10 @@ export function TransferForm({ onSuccess }: TransferFormProps) {
       setTransactionId("");
       setDate(format(new Date(), "yyyy-MM-dd"));
 
+      toast.success("Transfer transaction created successfully");
       onSuccess?.();
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to create transfer");
+      toast.error(error instanceof Error ? error.message : "Failed to create transfer");
     } finally {
       setLoading(false);
     }

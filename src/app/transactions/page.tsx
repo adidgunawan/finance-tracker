@@ -17,6 +17,7 @@ import { ExpenseForm } from "@/components/transactions/ExpenseForm";
 import { TransferForm } from "@/components/transactions/TransferForm";
 import { useTransactions } from "@/hooks/useTransactions";
 import { useCurrency } from "@/hooks/useCurrency";
+import { toast } from "sonner";
 import { format } from "date-fns";
 import { TrashIcon, PlusIcon, ArrowTopRightIcon, ArrowBottomLeftIcon, UpdateIcon } from "@radix-ui/react-icons";
 import { TransactionDetailDialog } from "@/components/transactions/TransactionDetailDialog";
@@ -40,7 +41,7 @@ export default function TransactionsPage() {
       setSelectedTransaction(transaction);
       setDetailOpen(true);
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to load transaction details");
+      toast.error(error instanceof Error ? error.message : "Failed to load transaction details");
     }
   };
 
@@ -60,13 +61,27 @@ export default function TransactionsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this transaction?")) return;
-
-    try {
-      await deleteTransaction(id);
-    } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to delete transaction");
-    }
+    toast("Are you sure you want to delete this transaction?", {
+      description: "This action cannot be undone.",
+      action: {
+        label: "Delete",
+        onClick: async () => {
+          try {
+            await deleteTransaction(id);
+            toast.success("Transaction deleted successfully");
+            if (selectedTransaction?.id === id) {
+              setSelectedTransaction(null);
+            }
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Failed to delete transaction");
+          }
+        },
+      },
+      cancel: {
+        label: "Cancel",
+        onClick: () => {},
+      },
+    });
   };
 
   if (loading) {
@@ -81,8 +96,8 @@ export default function TransactionsPage() {
     return (
       <div className="min-h-screen p-8 flex items-center justify-center">
          <Card className="border-destructive/20 p-6">
-            <p className="text-destructive flex items-center gap-2">
-                <span className="text-xl">⚠️</span> {error}
+            <p className="text-destructive">
+                {error}
             </p>
          </Card>
       </div>
@@ -124,9 +139,6 @@ export default function TransactionsPage() {
             <Card className="overflow-hidden">
               {transactions.length === 0 ? (
                 <div className="p-16 text-center flex flex-col items-center">
-                  <div className="w-16 h-16 rounded-full bg-muted mb-4 flex items-center justify-center text-3xl">
-                    📝
-                  </div>
                   <h3 className="text-lg font-medium text-foreground mb-2">No transactions yet</h3>
                   <p className="text-muted-foreground mb-6 max-w-sm">
                     Start tracking your finances by creating your first transaction record.

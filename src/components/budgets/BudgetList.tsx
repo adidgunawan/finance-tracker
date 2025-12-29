@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { BudgetProgress } from "./BudgetProgress";
 import { useBudgets, type Budget } from "@/hooks/useBudgets";
 import { useCurrency } from "@/hooks/useCurrency";
+import { toast } from "sonner";
 import { TrashIcon, UpdateIcon, MagnifyingGlassIcon } from "@radix-ui/react-icons";
 import { format } from "date-fns";
 
@@ -67,21 +68,33 @@ export function BudgetList({ onEdit, onViewComparison }: BudgetListProps) {
   }, [budgets, currentMonth, currentYear]);
 
   const handleDelete = async (id: string) => {
-    if (confirm("Are you sure you want to delete this budget?")) {
-      try {
-        await deleteBudget(id);
-      } catch (error) {
-        alert(error instanceof Error ? error.message : "Failed to delete budget");
-      }
-    }
+    toast("Are you sure you want to delete this budget?", {
+      description: "This action cannot be undone.",
+      action: {
+        label: "Delete",
+        onClick: async () => {
+          try {
+            await deleteBudget(id);
+            toast.success("Budget deleted successfully");
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Failed to delete budget");
+          }
+        },
+      },
+      cancel: {
+        label: "Cancel",
+        onClick: () => {},
+      },
+    });
   };
 
   const handleToggleStatus = async (id: string) => {
     try {
       await toggleBudgetStatus(id);
-    } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to update budget");
-    }
+        toast.success("Budget updated successfully");
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to update budget");
+      }
   };
 
   if (loading) {

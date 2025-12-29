@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -18,10 +19,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { getSettings } from "@/actions/settings";
 import type { Database } from "@/lib/supabase/types";
 
 type Account = Database["public"]["Tables"]["chart_of_accounts"]["Row"];
 type AccountType = Account["type"];
+
+const AVAILABLE_CURRENCIES = ["USD", "EUR", "GBP", "IDR", "JPY", "SGD"];
 
 interface AccountDialogProps {
   open: boolean;
@@ -33,6 +37,7 @@ interface AccountDialogProps {
     type: AccountType;
     parent_id: string | null;
     level: number;
+    currency: string | null;
   }) => Promise<void>;
 }
 
@@ -46,19 +51,39 @@ export function AccountDialog({
   const [name, setName] = useState("");
   const [type, setType] = useState<AccountType>("asset");
   const [parentId, setParentId] = useState<string | null>(null);
+  const [currency, setCurrency] = useState<string>("IDR");
   const [loading, setLoading] = useState(false);
+  const [loadingCurrency, setLoadingCurrency] = useState(false);
 
   useEffect(() => {
     if (account) {
       setName(account.name);
       setType(account.type);
       setParentId(account.parent_id);
+      setCurrency(account.currency || "IDR");
     } else {
       setName("");
       setType("asset");
       setParentId(null);
+      // Load default currency for new accounts
+      loadDefaultCurrency();
     }
   }, [account, open]);
+
+  const loadDefaultCurrency = async () => {
+    setLoadingCurrency(true);
+    try {
+      const settings = await getSettings();
+      if (settings?.default_currency) {
+        setCurrency(settings.default_currency);
+      }
+    } catch (error) {
+      console.error("Failed to load default currency:", error);
+      // Keep IDR as default
+    } finally {
+      setLoadingCurrency(false);
+    }
+  };
 
   const getLevel = () => {
     if (!parentId) return 1;
@@ -96,7 +121,7 @@ export function AccountDialog({
 
     const level = getLevel();
     if (level > 3) {
-      alert("Maximum account hierarchy depth is 3 levels");
+      toast.error("Maximum account hierarchy depth is 3 levels");
       return;
     }
 
@@ -107,10 +132,12 @@ export function AccountDialog({
         type,
         parent_id: parentId,
         level,
+        currency: currency || null,
       });
       onOpenChange(false);
+      toast.success(account ? "Account updated successfully" : "Account created successfully");
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to save account");
+      toast.error(error instanceof Error ? error.message : "Failed to save account");
     } finally {
       setLoading(false);
     }
@@ -184,6 +211,31 @@ export function AccountDialog({
             </Select>
             <p className="text-xs text-muted-foreground">
               Current level: {getLevel()} (Max: 3)
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="currency">
+              Currency
+            </Label>
+            <Select
+              value={currency}
+              onValueChange={setCurrency}
+              disabled={loadingCurrency}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {AVAILABLE_CURRENCIES.map((curr) => (
+                  <SelectItem key={curr} value={curr}>
+                    {curr}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Default currency from settings is used for new accounts
             </p>
           </div>
         </div>

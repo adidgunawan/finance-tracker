@@ -4,20 +4,22 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ReportFilters } from "@/components/reports/ReportFilters";
 import { ReportSummary } from "@/components/reports/ReportSummary";
 import { AccountHierarchyReport } from "@/components/reports/AccountHierarchyReport";
 import { TimeBasedReport } from "@/components/reports/TimeBasedReport";
 import { useReports } from "@/hooks/useReports";
 import { useCurrency } from "@/hooks/useCurrency";
 import { exportTransactionsReport, exportTimeBasedReport } from "@/lib/reports/export";
-import { DownloadIcon } from "@radix-ui/react-icons";
+import { DownloadIcon, ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons";
+import { getMonthRange } from "@/lib/utils/dateRange";
+import { format, subMonths, addMonths, isSameMonth, startOfMonth } from "date-fns";
 
 export default function ReportsPage() {
   const {
     filters,
     loading,
     error,
+    updateFilters,
     fetchTransactionsReport,
     fetchAccountHierarchyReport,
     fetchTimeBasedReport,
@@ -25,6 +27,7 @@ export default function ReportsPage() {
   const { format: formatCurrency } = useCurrency();
 
   const [activeTab, setActiveTab] = useState("summary");
+  const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
   const [transactions, setTransactions] = useState<any[]>([]);
   const [accountHierarchy, setAccountHierarchy] = useState<any[]>([]);
   const [timeBasedData, setTimeBasedData] = useState<Record<string, any[]>>({});
@@ -36,6 +39,13 @@ export default function ReportsPage() {
 
   const loadReports = async () => {
     try {
+      // Update filters with selected month range
+      const monthRange = getMonthRange(selectedMonth);
+      updateFilters({
+        startDate: monthRange.start.toISOString().split("T")[0],
+        endDate: monthRange.end.toISOString().split("T")[0],
+      });
+
       // Load all reports
       const [txData, hierarchyData, weekData, monthData, yearData] = await Promise.all([
         fetchTransactionsReport(),
@@ -75,7 +85,21 @@ export default function ReportsPage() {
   useEffect(() => {
     loadReports();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters]);
+  }, [selectedMonth]);
+
+  const handlePreviousMonth = () => {
+    setSelectedMonth(subMonths(selectedMonth, 1));
+  };
+
+  const handleNextMonth = () => {
+    setSelectedMonth(addMonths(selectedMonth, 1));
+  };
+
+  const handleThisMonth = () => {
+    setSelectedMonth(new Date());
+  };
+
+  const isCurrentMonth = isSameMonth(selectedMonth, new Date());
 
   const handleExport = () => {
     if (activeTab === "summary" || activeTab === "hierarchy") {
@@ -114,7 +138,36 @@ export default function ReportsPage() {
           </Button>
         </div>
 
-        <ReportFilters onApply={loadReports} />
+        <Card className="p-4">
+          <div className="flex items-center justify-center gap-4">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handlePreviousMonth}
+              className="h-9 w-9"
+            >
+              <ChevronLeftIcon className="h-4 w-4" />
+            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant={isCurrentMonth ? "default" : "outline"}
+                onClick={handleThisMonth}
+                className="min-w-[140px]"
+              >
+                {isCurrentMonth ? "This Month" : format(selectedMonth, "MMMM yyyy")}
+              </Button>
+            </div>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleNextMonth}
+              className="h-9 w-9"
+              disabled={isCurrentMonth}
+            >
+              <ChevronRightIcon className="h-4 w-4" />
+            </Button>
+          </div>
+        </Card>
 
         {loading ? (
           <Card className="p-6">

@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 const SUPPORTED_CURRENCIES = [
   { code: "USD", name: "US Dollar ($)" },
@@ -23,7 +24,7 @@ const SUPPORTED_CURRENCIES = [
 ];
 
 export default function SettingsPage() {
-  const [currency, setCurrency] = useState("USD");
+  const [currency, setCurrency] = useState("IDR");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -50,10 +51,10 @@ export default function SettingsPage() {
     try {
       setSaving(true);
       await updateSettings({ default_currency: currency });
-      alert("Settings saved!");
+      toast.success("Settings saved successfully");
     } catch (error) {
       console.error("Failed to save settings:", error);
-      alert("Failed to save settings");
+      toast.error("Failed to save settings");
     } finally {
       setSaving(false);
     }

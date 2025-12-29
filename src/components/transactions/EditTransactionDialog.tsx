@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { Database } from "@/lib/supabase/types";
+import { toast } from "sonner";
 import { format } from "date-fns";
 
 type Transaction = Database["public"]["Tables"]["transactions"]["Row"];
@@ -61,13 +62,13 @@ export function EditTransactionDialog({
 
   const handleSave = async () => {
     if (!transaction || !date || !description || !amount) {
-      alert("Please fill in all required fields");
+      toast.error("Please fill in all required fields");
       return;
     }
 
     const amountNum = parseFloat(amount);
     if (isNaN(amountNum) || amountNum <= 0) {
-      alert("Please enter a valid amount");
+      toast.error("Please enter a valid amount");
       return;
     }
 
@@ -80,9 +81,10 @@ export function EditTransactionDialog({
         payee_payer: payee || undefined,
         transaction_id: transactionId || undefined,
       });
+      toast.success("Transaction updated successfully");
       onOpenChange(false);
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to update transaction");
+      toast.error(error instanceof Error ? error.message : "Failed to update transaction");
     } finally {
       setLoading(false);
     }

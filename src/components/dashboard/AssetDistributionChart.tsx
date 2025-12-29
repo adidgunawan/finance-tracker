@@ -37,9 +37,6 @@ export function AssetDistributionChart({ data }: AssetDistributionChartProps) {
           Asset Distribution
         </h3>
         <div className="flex flex-col items-center justify-center text-muted-foreground">
-            <div className="w-16 h-16 rounded-full bg-muted mb-4 flex items-center justify-center text-2xl">
-                📊
-            </div>
             <p className="font-medium">No asset data available</p>
         </div>
       </Card>

@@ -5,7 +5,7 @@ import { getSettings } from "@/actions/settings";
 import { formatCurrency, getCurrencySymbol } from "@/lib/currency";
 
 export function useCurrency() {
-  const [currency, setCurrency] = useState<string>("USD");
+  const [currency, setCurrency] = useState<string>("IDR");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

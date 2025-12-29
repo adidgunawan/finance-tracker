@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Sidebar } from "@/components/layout/Sidebar";
+import { AppSidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
+import { Toaster } from "@/components/ui/sonner";
 
 export const metadata: Metadata = {
   title: "Finance Tracker",
@@ -16,13 +18,14 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="font-sans antialiased bg-background min-h-screen" suppressHydrationWarning>
-        <div className="flex relative">
-          <Sidebar />
-          <div className="flex-1 flex flex-col min-h-screen">
+        <SidebarProvider>
+          <AppSidebar />
+          <SidebarInset>
             <Header />
             <main className="flex-1">{children}</main>
-          </div>
-        </div>
+          </SidebarInset>
+        </SidebarProvider>
+        <Toaster />
       </body>
     </html>
   );

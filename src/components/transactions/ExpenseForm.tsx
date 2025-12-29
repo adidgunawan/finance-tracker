@@ -23,6 +23,7 @@ import {
 import { useAccounts } from "@/hooks/useAccounts";
 import { useTransactions } from "@/hooks/useTransactions";
 import { useCurrency } from "@/hooks/useCurrency";
+import { toast } from "sonner";
 import { format } from "date-fns";
 import type { Database } from "@/lib/supabase/types";
 import { PlusIcon, TrashIcon } from "@radix-ui/react-icons";
@@ -88,7 +89,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
     e.preventDefault();
 
     if (!assetAccountId) {
-      alert("Please select an asset account");
+      toast.error("Please select an asset account");
       return;
     }
 
@@ -98,7 +99,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
     );
 
     if (hasInvalidItems) {
-      alert("Please fill in all fields for all line items");
+      toast.error("Please fill in all fields for all line items");
       return;
     }
 
@@ -108,7 +109,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
     });
 
     if (hasInvalidAmounts) {
-      alert("Please enter valid amounts for all line items");
+      toast.error("Please enter valid amounts for all line items");
       return;
     }
 
@@ -132,9 +133,10 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
       setTransactionId("");
       setDate(format(new Date(), "yyyy-MM-dd"));
 
+      toast.success("Expense transaction created successfully");
       onSuccess?.();
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to create expense");
+      toast.error(error instanceof Error ? error.message : "Failed to create expense");
     } finally {
       setLoading(false);
     }

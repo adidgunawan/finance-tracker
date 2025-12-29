@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/table";
 import type { Database } from "@/lib/supabase/types";
 import { PlusIcon, TrashIcon } from "@radix-ui/react-icons";
+import { toast } from "sonner";
 import { useCurrency } from "@/hooks/useCurrency";
 
 type Budget = Database["public"]["Tables"]["budgets"]["Row"] & {
@@ -168,26 +169,26 @@ export function BudgetDialog({
 
   const handleSave = async () => {
     if (!accountId) {
-      alert("Please select an account");
+      toast.error("Please select an account");
       return;
     }
 
     if (budgetType === "fixed_monthly") {
       if (!fixedAmount || parseFloat(fixedAmount) <= 0) {
-        alert("Please enter a valid fixed monthly amount");
+        toast.error("Please enter a valid fixed monthly amount");
         return;
       }
     } else if (budgetType === "date_range") {
       if (!startDate || !endDate) {
-        alert("Please select start and end dates");
+        toast.error("Please select start and end dates");
         return;
       }
       if (!totalAmount || parseFloat(totalAmount) <= 0) {
-        alert("Please enter a valid total amount");
+        toast.error("Please enter a valid total amount");
         return;
       }
       if (new Date(startDate) > new Date(endDate)) {
-        alert("End date must be after start date");
+        toast.error("End date must be after start date");
         return;
       }
     } else if (budgetType === "custom_monthly") {
@@ -195,7 +196,7 @@ export function BudgetDialog({
         (m) => m.amount && parseFloat(m.amount) > 0
       );
       if (validAmounts.length === 0) {
-        alert("Please enter at least one monthly amount");
+        toast.error("Please enter at least one monthly amount");
         return;
       }
     }
@@ -220,9 +221,10 @@ export function BudgetDialog({
                 }))
             : [],
       });
+      toast.success(budget ? "Budget updated successfully" : "Budget created successfully");
       onOpenChange(false);
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to save budget");
+      toast.error(error instanceof Error ? error.message : "Failed to save budget");
     } finally {
       setLoading(false);
     }

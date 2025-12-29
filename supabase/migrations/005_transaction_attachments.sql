@@ -1,0 +1,63 @@
+-- Transaction Attachments
+-- Allows multiple file attachments (images/PDFs) per transaction stored in Google Drive
+CREATE TABLE transaction_attachments (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  transaction_id UUID NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
+  filename TEXT NOT NULL,
+  mime_type TEXT NOT NULL,
+  file_size BIGINT NOT NULL CHECK (file_size > 0),
+  drive_file_id TEXT NOT NULL UNIQUE,
+  drive_web_view_link TEXT NOT NULL,
+  drive_download_link TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Index for faster lookups
+CREATE INDEX idx_transaction_attachments_transaction_id ON transaction_attachments(transaction_id);
+CREATE INDEX idx_transaction_attachments_drive_file_id ON transaction_attachments(drive_file_id);
+
+-- Enable RLS
+ALTER TABLE transaction_attachments ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for transaction_attachments
+-- Users can only access attachments for their own transactions
+CREATE POLICY "Users can view own transaction attachments" ON transaction_attachments
+  FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM transactions
+      WHERE transactions.id = transaction_attachments.transaction_id
+      AND transactions.user_id = auth.uid()::text
+    )
+  );
+
+CREATE POLICY "Users can insert own transaction attachments" ON transaction_attachments
+  FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM transactions
+      WHERE transactions.id = transaction_attachments.transaction_id
+      AND transactions.user_id = auth.uid()::text
+    )
+  );
+
+CREATE POLICY "Users can update own transaction attachments" ON transaction_attachments
+  FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM transactions
+      WHERE transactions.id = transaction_attachments.transaction_id
+      AND transactions.user_id = auth.uid()::text
+    )
+  );
+
+CREATE POLICY "Users can delete own transaction attachments" ON transaction_attachments
+  FOR DELETE
+  USING (
+    EXISTS (
+      SELECT 1 FROM transactions
+      WHERE transactions.id = transaction_attachments.transaction_id
+      AND transactions.user_id = auth.uid()::text
+    )
+  );
+

@@ -7,7 +7,7 @@ export function exportToCSV(
   headers?: string[]
 ) {
   if (data.length === 0) {
-    alert("No data to export");
+    // No data to export - this is handled by the calling component
     return;
   }
 

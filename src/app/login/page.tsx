@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { authClient } from "@/lib/auth-client";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
@@ -36,7 +37,10 @@ export default function LoginPage() {
         errorMessage = error.data.error;
       }
       
-      alert(`Sign in failed: ${errorMessage}\n\nPlease check:\n1. Google OAuth credentials are configured\n2. Redirect URL is set correctly in Google Console (http://localhost:3000/api/auth/callback/google)\n3. Server is running properly\n4. Check the browser console and server terminal for more details`);
+      toast.error(`Sign in failed: ${errorMessage}`, {
+        description: "Please check: Google OAuth credentials, Redirect URL in Google Console, and server status.",
+        duration: 10000,
+      });
     } finally {
       setIsLoading(false);
     }
@@ -46,9 +50,6 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4 animate-in fade-in duration-500">
       <Card className="w-full max-w-sm">
         <CardHeader className="space-y-1 text-center pb-8">
-          <div className="mx-auto w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center mb-4 text-2xl">
-            ✨
-          </div>
           <CardTitle className="text-2xl font-bold tracking-tight">Welcome Back</CardTitle>
           <CardDescription className="text-base">
             Sign in to access your personal finance tracker
