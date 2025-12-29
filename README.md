@@ -1,36 +1,159 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Finance Tracker
+
+A personal finance web application built with correct accounting principles and a macOS-style minimalist UI.
+
+## Features
+
+### ✅ Implemented
+
+- **Chart of Accounts**
+  - Tree-based hierarchy (max 3 levels)
+  - Account types: Asset, Liability, Income, Expense
+  - CRUD operations with validation
+  - Expand/collapse tree view
+
+- **Transaction System**
+  - Double-entry accounting (abstracted from UI)
+  - Income transactions
+  - Expense transactions
+  - Transfer between accounts (with optional fees)
+  - Transaction list with filters
+
+- **Dashboard**
+  - Cash flow summary cards
+  - Monthly trend chart (Income vs Expense)
+  - Asset distribution pie chart
+  - Last 6 months data visualization
+
+- **Navigation**
+  - Clean sidebar navigation
+  - macOS-inspired design system
+
+### 🚧 Planned
+
+- **Reports**
+  - Time-based reports (Weekly/Monthly/Yearly)
+  - Grouped by Chart of Accounts
+  - Expandable hierarchy
+  - Advanced filters
+
+- **Budgeting**
+  - Fixed monthly budgets
+  - Custom monthly amounts
+  - Date range budgets
+  - Budget vs actual comparison
+
+- **Attachments**
+  - File upload for transactions
+  - Google Drive integration (or local storage)
+
+## Tech Stack
+
+- **Framework**: Next.js 15 with TypeScript
+- **Styling**: Tailwind CSS (macOS color system)
+- **UI Components**: shadcn/ui (Radix UI)
+- **Icons**: Radix Icons only
+- **Charts**: Recharts
+- **Database**: Supabase (PostgreSQL)
+- **Authentication**: Supabase Auth
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- Node.js 18+ installed
+- Supabase account and project
+
+### Installation
+
+1. Clone the repository
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Set up environment variables:
+   - Copy `.env.local` and update with your Supabase credentials
+   - Required variables:
+     - `NEXT_PUBLIC_SUPABASE_URL`
+     - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+4. Run database migrations:
+   - Execute the SQL in `supabase/migrations/001_initial_schema.sql` in your Supabase SQL editor
+
+5. Start the development server:
+   ```bash
+   npm run dev
+   ```
+
+6. Open [http://localhost:3000](http://localhost:3000)
+
+## Database Schema
+
+The application uses a proper double-entry accounting system:
+
+- **chart_of_accounts**: Account hierarchy with type validation
+- **transactions**: Main transaction records
+- **transaction_lines**: Double-entry journal entries (debits/credits)
+- **transaction_tags**: Optional tags for categorization
+- **budgets**: Budget definitions
+- **budget_monthly_amounts**: Monthly budget amounts
+
+All tables have Row Level Security (RLS) enabled for user data isolation.
+
+## Design Principles
+
+- **Accounting Correctness**: Proper double-entry bookkeeping
+- **Minimalist UI**: macOS-inspired, clean, no visual noise
+- **Desktop-First**: Optimized for desktop usage
+- **Neutral Colors**: Grey palette with subtle accent colors
+- **Functional Over Decorative**: Every element serves a purpose
+
+## Color System
+
+```css
+--background: #f5f5f7
+--surface: #ffffff
+--border: #e5e5ea
+--text-primary: #1d1d1f
+--text-secondary: #6e6e73
+--accent-primary: #007aff (blue)
+--accent-success: #34c759 (green)
+--accent-warning: #ff9f0a (orange)
+--accent-danger: #ff453a (red)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Project Structure
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+src/
+├── app/                    # Next.js app router pages
+│   ├── accounts/          # Chart of Accounts page
+│   ├── transactions/      # Transactions page
+│   ├── reports/           # Reports page (placeholder)
+│   ├── budgets/           # Budgets page (placeholder)
+│   └── page.tsx           # Dashboard
+├── components/
+│   ├── accounts/          # Account-related components
+│   ├── transactions/      # Transaction forms
+│   ├── dashboard/         # Dashboard charts
+│   ├── layout/            # Navigation components
+│   └── ui/                # shadcn/ui components
+├── hooks/                 # React hooks for data fetching
+├── lib/
+│   ├── accounting/        # Double-entry logic
+│   ├── supabase/          # Supabase client & types
+│   └── utils.ts           # Utility functions
+└── supabase/
+    └── migrations/        # Database migrations
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Known Issues
 
-## Learn More
+- Production build currently has a webpack configuration issue with Tailwind CSS
+- Development mode works perfectly
+- Google Drive attachment integration is planned but not implemented
 
-To learn more about Next.js, take a look at the following resources:
+## License
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+MIT
