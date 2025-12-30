@@ -1,147 +1,11 @@
 import { google } from "googleapis";
 import { Readable } from "stream";
+import { getDriveClientForUser, getUserDriveTokens } from "./google-drive-oauth";
 
 interface DriveFileMetadata {
   driveFileId: string;
   driveWebViewLink: string;
   driveDownloadLink: string;
-}
-
-let driveClient: ReturnType<typeof google.drive> | null = null;
-let rootFolderId: string | null = null;
-
-/**
- * Initialize Google Drive client with service account
- */
-export function initializeDriveClient() {
-  if (driveClient) {
-    return driveClient;
-  }
-
-  if (!process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_EMAIL) {
-    throw new Error("GOOGLE_DRIVE_SERVICE_ACCOUNT_EMAIL is not set");
-  }
-
-  if (!process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_PRIVATE_KEY) {
-    throw new Error("GOOGLE_DRIVE_SERVICE_ACCOUNT_PRIVATE_KEY is not set");
-  }
-
-  // Handle private key - it can come in different formats
-  let privateKey = process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_PRIVATE_KEY;
-
-  if (!privateKey) {
-    throw new Error("GOOGLE_DRIVE_SERVICE_ACCOUNT_PRIVATE_KEY is empty");
-  }
-
-  // Remove any surrounding quotes that might have been added
-  privateKey = privateKey.trim().replace(/^["']|["']$/g, "");
-
-  // Check if it's base64 encoded (doesn't contain BEGIN marker)
-  if (!privateKey.includes("-----BEGIN")) {
-    try {
-      // Try to decode from base64
-      const decoded = Buffer.from(privateKey, "base64").toString("utf-8");
-      if (decoded.includes("-----BEGIN")) {
-        privateKey = decoded;
-      } else {
-        throw new Error("Base64 decoded value doesn't contain a valid private key");
-      }
-    } catch (e: any) {
-      // If base64 decode fails, check if it's a JSON string
-      try {
-        const parsed = JSON.parse(privateKey);
-        if (parsed.private_key) {
-          privateKey = parsed.private_key;
-        }
-      } catch (jsonError) {
-        throw new Error(
-          `Invalid private key format. The key must be either:\n` +
-          `1. A raw private key starting with "-----BEGIN PRIVATE KEY-----"\n` +
-          `2. A base64-encoded private key\n` +
-          `3. A JSON object with a "private_key" field\n` +
-          `Current key starts with: ${privateKey.substring(0, 50)}...`
-        );
-      }
-    }
-  }
-
-  // Replace escaped newlines (common in environment variables)
-  // Handle both \\n (double escaped) and \n (single escaped)
-  privateKey = privateKey.replace(/\\\\n/g, "\n").replace(/\\n/g, "\n");
-  
-  // Ensure proper line breaks (some systems might have different line endings)
-  privateKey = privateKey.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-  
-  // Validate the key structure
-  if (!privateKey.includes("-----BEGIN PRIVATE KEY-----")) {
-    throw new Error(
-      "Private key must start with '-----BEGIN PRIVATE KEY-----'. " +
-      "If you're using a JSON service account file, extract the 'private_key' field value."
-    );
-  }
-
-  if (!privateKey.includes("-----END PRIVATE KEY-----")) {
-    throw new Error(
-      "Private key must end with '-----END PRIVATE KEY-----'. " +
-      "Make sure all newlines are properly escaped as \\n in your .env file."
-    );
-  }
-
-  // Extract just the key content between BEGIN and END markers
-  const beginMarker = "-----BEGIN PRIVATE KEY-----";
-  const endMarker = "-----END PRIVATE KEY-----";
-  const beginIndex = privateKey.indexOf(beginMarker);
-  const endIndex = privateKey.indexOf(endMarker);
-  
-  if (beginIndex === -1 || endIndex === -1 || endIndex <= beginIndex) {
-    throw new Error("Could not find valid BEGIN/END markers in private key");
-  }
-  
-  // Reconstruct the key with proper formatting
-  const keyContent = privateKey.substring(beginIndex, endIndex + endMarker.length);
-  
-  // Validate the key has actual content (not just markers)
-  const keyBody = keyContent
-    .replace(beginMarker, "")
-    .replace(endMarker, "")
-    .trim();
-  
-  if (keyBody.length < 100) {
-    throw new Error(
-      "Private key appears to be too short or incomplete. " +
-      "Make sure you copied the entire key including all lines between BEGIN and END markers."
-    );
-  }
-
-  // Final key with proper formatting
-  privateKey = `${beginMarker}\n${keyBody}\n${endMarker}`;
-
-  try {
-    const auth = new google.auth.JWT({
-      email: process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_EMAIL,
-      key: privateKey,
-      scopes: ["https://www.googleapis.com/auth/drive"],
-    });
-
-    driveClient = google.drive({ version: "v3", auth });
-  } catch (error: any) {
-    if (error.code === "ERR_OSSL_UNSUPPORTED" || error.message?.includes("DECODER")) {
-      throw new Error(
-        "Failed to parse private key (OpenSSL error). Common causes:\n" +
-        "1. Private key format is incorrect\n" +
-        "2. Newlines are not properly escaped (use \\n in .env files)\n" +
-        "3. Key is corrupted or incomplete\n\n" +
-        "To fix: Copy the 'private_key' value from your service account JSON file, " +
-        "replace all actual newlines with \\n, and put it all on one line in .env.local"
-      );
-    }
-    throw error;
-  }
-
-  // Get root folder ID if specified
-  rootFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID || null;
-
-  return driveClient;
 }
 
 /**
@@ -152,56 +16,104 @@ async function getOrCreateFolder(
   parentFolderId: string | null,
   folderName: string
 ): Promise<string> {
-  // Search for existing folder
-  const query = `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
-  const parentQuery = parentFolderId
-    ? `'${parentFolderId}' in parents`
-    : "parents in 'root'";
-  const fullQuery = `${query} and ${parentQuery}`;
+  try {
+    // Search for existing folder only if we have a parent
+    if (parentFolderId) {
+      const query = `name='${folderName.replace(/'/g, "\\'")}' and mimeType='application/vnd.google-apps.folder' and trashed=false and '${parentFolderId}' in parents`;
+      
+      try {
+        const response = await drive.files.list({
+          q: query,
+          fields: "files(id, name)",
+        });
 
-  const response = await drive.files.list({
-    q: fullQuery,
-    fields: "files(id, name)",
-  });
+        if (response.data.files && response.data.files.length > 0) {
+          return response.data.files[0].id!;
+        }
+      } catch (queryError: any) {
+        // If query fails (e.g., parent doesn't exist), continue to create
+        console.warn(`Query failed for folder "${folderName}", will create new folder:`, queryError.message);
+      }
+    } else {
+      // For root, try to find folder
+      const query = `name='${folderName.replace(/'/g, "\\'")}' and mimeType='application/vnd.google-apps.folder' and trashed=false and 'root' in parents`;
+      
+      try {
+        const response = await drive.files.list({
+          q: query,
+          fields: "files(id, name)",
+        });
 
-  if (response.data.files && response.data.files.length > 0) {
-    return response.data.files[0].id!;
+        if (response.data.files && response.data.files.length > 0) {
+          return response.data.files[0].id!;
+        }
+      } catch (queryError: any) {
+        // If query fails, continue to create
+        console.warn(`Query failed for root folder "${folderName}", will create new folder:`, queryError.message);
+      }
+    }
+
+    // Create folder if it doesn't exist
+    const folderMetadata: any = {
+      name: folderName,
+      mimeType: "application/vnd.google-apps.folder",
+    };
+
+    // Set parents - if parentFolderId is null, omit parents to create in root
+    if (parentFolderId) {
+      folderMetadata.parents = [parentFolderId];
+    }
+    // If parentFolderId is null, don't set parents - this creates in root
+
+    const folder = await drive.files.create({
+      requestBody: folderMetadata,
+      fields: "id, name",
+    });
+
+    if (!folder.data.id) {
+      throw new Error("Failed to create folder: no ID returned");
+    }
+
+    // Verify the folder was created successfully
+    try {
+      const createdFolder = await drive.files.get({
+        fileId: folder.data.id,
+        fields: "id, name",
+      });
+      console.log(`Successfully created/verified folder: ${createdFolder.data.name} (${createdFolder.data.id})`);
+    } catch (verifyError: any) {
+      console.warn(`Warning: Created folder but cannot verify access:`, verifyError.message);
+    }
+
+    return folder.data.id;
+  } catch (error: any) {
+    console.error(`Error in getOrCreateFolder for "${folderName}":`, error);
+    throw new Error(`Failed to get or create folder "${folderName}": ${error.message}`);
   }
-
-  // Create folder if it doesn't exist
-  const folderMetadata = {
-    name: folderName,
-    mimeType: "application/vnd.google-apps.folder",
-    ...(parentFolderId && { parents: [parentFolderId] }),
-  };
-
-  const folder = await drive.files.create({
-    requestBody: folderMetadata,
-    fields: "id",
-  });
-
-  return folder.data.id!;
 }
 
 /**
- * Create user-specific folder structure
+ * Create user-specific folder structure in their Google Drive
  * Returns the transaction folder ID for the user
  */
 export async function createUserFolder(userId: string): Promise<string> {
-  const drive = initializeDriveClient();
+  const drive = await getDriveClientForUser(userId);
 
   // Create folder structure: Finance Tracker/Users/{userId}/Transactions
-  let currentFolderId = rootFolderId;
+  // Start from root (user's Drive root)
+  let currentFolderId: string | null = null;
 
-  // Create "Finance Tracker" folder if root folder is not specified
-  if (!currentFolderId) {
-    currentFolderId = await getOrCreateFolder(drive, null, "Finance Tracker");
-  }
+  // Create "Finance Tracker" folder in user's root
+  const financeTrackerFolderId = await getOrCreateFolder(
+    drive,
+    currentFolderId,
+    "Finance Tracker"
+  );
 
   // Create "Users" folder
   const usersFolderId = await getOrCreateFolder(
     drive,
-    currentFolderId,
+    financeTrackerFolderId,
     "Users"
   );
 
@@ -215,11 +127,25 @@ export async function createUserFolder(userId: string): Promise<string> {
     "Transactions"
   );
 
+  // Verify the final folder is accessible
+  try {
+    const finalFolder = await drive.files.get({
+      fileId: transactionsFolderId,
+      fields: "id, name, parents",
+    });
+    console.log(`Final transactions folder created: ${finalFolder.data.name} (${finalFolder.data.id})`);
+    if (finalFolder.data.parents && finalFolder.data.parents.length > 0) {
+      console.log(`Folder parent: ${finalFolder.data.parents[0]}`);
+    }
+  } catch (verifyError: any) {
+    console.warn(`Warning: Cannot verify final folder:`, verifyError.message);
+  }
+
   return transactionsFolderId;
 }
 
 /**
- * Upload a file to Google Drive
+ * Upload a file to Google Drive using OAuth
  */
 export async function uploadFile(
   file: File | Buffer,
@@ -228,7 +154,15 @@ export async function uploadFile(
   filename: string,
   mimeType: string
 ): Promise<DriveFileMetadata> {
-  const drive = initializeDriveClient();
+  // Check if user has Google Drive connected
+  const tokens = await getUserDriveTokens(userId);
+  if (!tokens) {
+    throw new Error(
+      "Google Drive not connected. Please connect your Google Drive account in Settings."
+    );
+  }
+
+  const drive = await getDriveClientForUser(userId);
 
   // Get or create user's transaction folder
   const transactionsFolderId = await createUserFolder(userId);
@@ -263,24 +197,39 @@ export async function uploadFile(
     body: Readable.from(fileBuffer),
   };
 
-  const uploadedFile = await drive.files.create({
-    requestBody: fileMetadata,
-    media,
-    fields: "id, webViewLink, webContentLink",
-  });
+  let uploadedFile;
+  try {
+    console.log(`Uploading file "${sanitizedFilename}" to folder ${transactionFolderId}`);
+    uploadedFile = await drive.files.create({
+      requestBody: fileMetadata,
+      media,
+      fields: "id, webViewLink, webContentLink",
+    });
+    console.log(`File uploaded successfully: ${uploadedFile.data.id}`);
+  } catch (uploadError: any) {
+    console.error("Upload error:", uploadError);
+    throw new Error(
+      `Failed to upload file to Google Drive: ${uploadError.message || "Unknown error"}`
+    );
+  }
 
   if (!uploadedFile.data.id) {
     throw new Error("Failed to upload file to Google Drive");
   }
 
-  // Make file accessible (service account files need to be shared)
-  await drive.permissions.create({
-    fileId: uploadedFile.data.id,
-    requestBody: {
-      role: "reader",
-      type: "anyone",
-    },
-  });
+  // Make file accessible (optional - for viewing in app)
+  try {
+    await drive.permissions.create({
+      fileId: uploadedFile.data.id,
+      requestBody: {
+        role: "reader",
+        type: "anyone",
+      },
+    });
+  } catch (permError) {
+    // Non-critical - file is still uploaded
+    console.warn("Failed to set file permissions:", permError);
+  }
 
   // Get download link
   const downloadLink = `https://drive.google.com/uc?export=download&id=${uploadedFile.data.id}`;
@@ -295,8 +244,8 @@ export async function uploadFile(
 /**
  * Delete a file from Google Drive
  */
-export async function deleteFile(driveFileId: string): Promise<void> {
-  const drive = initializeDriveClient();
+export async function deleteFile(driveFileId: string, userId: string): Promise<void> {
+  const drive = await getDriveClientForUser(userId);
 
   try {
     await drive.files.delete({
@@ -314,7 +263,8 @@ export async function deleteFile(driveFileId: string): Promise<void> {
  * Get file metadata from Google Drive
  */
 export async function getFileMetadata(
-  driveFileId: string
+  driveFileId: string,
+  userId: string
 ): Promise<{
   name: string;
   mimeType: string;
@@ -322,7 +272,7 @@ export async function getFileMetadata(
   webViewLink: string;
   webContentLink: string;
 }> {
-  const drive = initializeDriveClient();
+  const drive = await getDriveClientForUser(userId);
 
   const file = await drive.files.get({
     fileId: driveFileId,
@@ -341,4 +291,3 @@ export async function getFileMetadata(
     webContentLink: file.data.webContentLink || "",
   };
 }
-

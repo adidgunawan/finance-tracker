@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -16,9 +17,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useCurrency } from "@/hooks/useCurrency";
 import { format } from "date-fns";
 import type { Database } from "@/lib/supabase/types";
+import { getTransactionAttachments } from "@/actions/transactions";
+import { FileTextIcon, ExternalLinkIcon } from "@radix-ui/react-icons";
 
 type Transaction = Database["public"]["Tables"]["transactions"]["Row"] & {
   transaction_lines?: Array<{
@@ -37,6 +41,23 @@ type Transaction = Database["public"]["Tables"]["transactions"]["Row"] & {
     expense_account?: { id: string; name: string } | null;
     income_account?: { id: string; name: string } | null;
   }>;
+  transaction_attachments?: Array<{
+    id: string;
+    filename: string;
+    mime_type: string;
+    file_size: number;
+    drive_web_view_link: string;
+    drive_download_link: string;
+  }>;
+};
+
+type Attachment = {
+  id: string;
+  filename: string;
+  mime_type: string;
+  file_size: number;
+  drive_web_view_link: string;
+  drive_download_link: string;
 };
 
 interface TransactionDetailDialogProps {
@@ -51,6 +72,40 @@ export function TransactionDetailDialog({
   transaction,
 }: TransactionDetailDialogProps) {
   const { format: formatCurrency } = useCurrency();
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [loadingAttachments, setLoadingAttachments] = useState(false);
+
+  useEffect(() => {
+    if (open && transaction?.id) {
+      loadAttachments();
+    } else {
+      setAttachments([]);
+    }
+  }, [open, transaction?.id]);
+
+  const loadAttachments = async () => {
+    if (!transaction?.id) return;
+    
+    setLoadingAttachments(true);
+    try {
+      const data = await getTransactionAttachments(transaction.id);
+      setAttachments(data as Attachment[]);
+    } catch (error) {
+      console.error("Failed to load attachments:", error);
+    } finally {
+      setLoadingAttachments(false);
+    }
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  };
+
+  const isImage = (mimeType: string) => {
+    return mimeType.startsWith("image/");
+  };
 
   if (!transaction) return null;
 
@@ -174,6 +229,62 @@ export function TransactionDetailDialog({
                   ))}
                 </TableBody>
               </Table>
+            </Card>
+          )}
+
+          {/* Attachments */}
+          {attachments.length > 0 && (
+            <Card className="p-4">
+              <h3 className="font-semibold mb-4">Attachments</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {attachments.map((attachment) => (
+                  <div
+                    key={attachment.id}
+                    className="border rounded-lg p-3 space-y-2 hover:bg-muted/50 transition-colors"
+                  >
+                    {isImage(attachment.mime_type) ? (
+                      <div className="relative aspect-video rounded overflow-hidden bg-muted">
+                        <img
+                          src={attachment.drive_web_view_link}
+                          alt={attachment.filename}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className="aspect-video rounded bg-muted flex items-center justify-center">
+                        <FileTextIcon className="h-8 w-8 text-muted-foreground" />
+                      </div>
+                    )}
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium truncate" title={attachment.filename}>
+                        {attachment.filename}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatFileSize(attachment.file_size)}
+                      </p>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-xs h-7"
+                          onClick={() => window.open(attachment.drive_web_view_link, "_blank")}
+                        >
+                          <ExternalLinkIcon className="h-3 w-3 mr-1" />
+                          View
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-xs h-7"
+                          onClick={() => window.open(attachment.drive_download_link, "_blank")}
+                        >
+                          Download
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </Card>
           )}
         </div>

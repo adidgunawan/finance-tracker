@@ -101,13 +101,26 @@ export async function POST(request: NextRequest) {
     // Upload to Google Drive
     // If transactionId is not provided, use a temporary ID (will be updated later)
     const tempTransactionId = transactionId || `temp-${Date.now()}`;
-    const driveMetadata = await uploadFile(
-      file,
-      session.user.id,
-      tempTransactionId,
-      file.name,
-      file.type
-    );
+    
+    let driveMetadata;
+    try {
+      driveMetadata = await uploadFile(
+        file,
+        session.user.id,
+        tempTransactionId,
+        file.name,
+        file.type
+      );
+    } catch (driveError: any) {
+      console.error("Google Drive upload error:", driveError);
+      return NextResponse.json(
+        {
+          error: "Failed to upload file to Google Drive",
+          details: driveError.message || "Unknown error",
+        },
+        { status: 500 }
+      );
+    }
 
     // Store metadata in database
     const supabase = createAdminClient();
@@ -129,7 +142,7 @@ export async function POST(request: NextRequest) {
       // Clean up Google Drive file if database insert fails
       try {
         const { deleteFile } = await import("@/lib/google-drive");
-        await deleteFile(driveMetadata.driveFileId);
+        await deleteFile(driveMetadata.driveFileId, session.user.id);
       } catch (cleanupError) {
         console.error("Failed to cleanup Google Drive file:", cleanupError);
       }

@@ -16,11 +16,23 @@ import { useTransactions } from "@/hooks/useTransactions";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import type { Database } from "@/lib/supabase/types";
+import { FileUpload } from "@/components/transactions/FileUpload";
+import { deleteAttachment } from "@/actions/transactions";
 
 type Account = Database["public"]["Tables"]["chart_of_accounts"]["Row"];
 
 interface TransferFormProps {
   onSuccess?: () => void;
+}
+
+interface FileAttachment {
+  id: string;
+  filename: string;
+  mimeType: string;
+  fileSize: number;
+  driveWebViewLink: string;
+  driveDownloadLink: string;
+  preview?: string;
 }
 
 export function TransferForm({ onSuccess }: TransferFormProps) {
@@ -37,6 +49,7 @@ export function TransferForm({ onSuccess }: TransferFormProps) {
   const [feeAmount, setFeeAmount] = useState("");
   const [feeAccountId, setFeeAccountId] = useState("");
   const [transactionId, setTransactionId] = useState("");
+  const [attachments, setAttachments] = useState<FileAttachment[]>([]);
 
   const assetAccounts = getAccountsByType("asset").filter((a: Account) => a.is_active);
   const expenseAccounts = getAccountsByType("expense").filter((a: Account) => a.is_active);
@@ -74,6 +87,8 @@ export function TransferForm({ onSuccess }: TransferFormProps) {
     }
 
     setLoading(true);
+    const attachmentIds = attachments.map((att) => att.id);
+    
     try {
       await createTransfer(
         date,
@@ -82,7 +97,10 @@ export function TransferForm({ onSuccess }: TransferFormProps) {
         fromAccountId,
         toAccountId,
         feeAmountNum,
-        feeAccountId || undefined
+        feeAccountId || undefined,
+        undefined, // currency
+        undefined, // exchangeRate
+        attachmentIds.length > 0 ? attachmentIds : undefined
       );
 
       // Reset form
@@ -91,11 +109,22 @@ export function TransferForm({ onSuccess }: TransferFormProps) {
       setFeeAmount("");
       setHasFee(false);
       setTransactionId("");
+      setAttachments([]);
       setDate(format(new Date(), "yyyy-MM-dd"));
 
       toast.success("Transfer transaction created successfully");
       onSuccess?.();
     } catch (error) {
+      // Cleanup uploaded files if transaction creation or linking fails
+      if (attachmentIds.length > 0) {
+        for (const attachmentId of attachmentIds) {
+          try {
+            await deleteAttachment(attachmentId);
+          } catch (cleanupError) {
+            console.error("Failed to cleanup attachment:", cleanupError);
+          }
+        }
+      }
       toast.error(error instanceof Error ? error.message : "Failed to create transfer");
     } finally {
       setLoading(false);
@@ -245,6 +274,15 @@ export function TransferForm({ onSuccess }: TransferFormProps) {
           value={transactionId}
           onChange={(e) => setTransactionId(e.target.value)}
           placeholder="Reference number"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Attachments (Optional)</Label>
+        <FileUpload
+          attachments={attachments}
+          onFilesChange={setAttachments}
+          disabled={loading}
         />
       </div>
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { getSettings, updateSettings } from "@/actions/settings";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -13,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { GoogleDriveConnection } from "@/components/settings/GoogleDriveConnection";
 
 const SUPPORTED_CURRENCIES = [
   { code: "USD", name: "US Dollar ($)" },
@@ -27,10 +29,25 @@ export default function SettingsPage() {
   const [currency, setCurrency] = useState("IDR");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     loadSettings();
-  }, []);
+    
+    // Handle OAuth callback messages
+    const success = searchParams.get("success");
+    const error = searchParams.get("error");
+    
+    if (success === "google_drive_connected") {
+      toast.success("Google Drive connected successfully!");
+      // Remove query param from URL
+      window.history.replaceState({}, "", "/settings");
+    } else if (error) {
+      toast.error(`Failed to connect Google Drive: ${decodeURIComponent(error)}`);
+      // Remove query param from URL
+      window.history.replaceState({}, "", "/settings");
+    }
+  }, [searchParams]);
 
   const loadSettings = async () => {
     try {
@@ -113,6 +130,8 @@ export default function SettingsPage() {
             </Button>
           </div>
         </Card>
+
+        <GoogleDriveConnection />
       </div>
     </div>
   );

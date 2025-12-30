@@ -12,6 +12,7 @@ import {
   generateTransferLines,
   validateBalance,
 } from "@/lib/accounting/double-entry";
+import { deleteFile } from "@/lib/google-drive";
 
 type TransactionInsert = Database["public"]["Tables"]["transactions"]["Insert"];
 type TransactionLineInsert = Database["public"]["Tables"]["transaction_lines"]["Insert"];
@@ -233,7 +234,8 @@ export async function getTransaction(id: string) {
         *,
         expense_account:chart_of_accounts!transaction_line_items_expense_account_id_fkey(id, name),
         income_account:chart_of_accounts!transaction_line_items_income_account_id_fkey(id, name)
-      )
+      ),
+      transaction_attachments(*)
     `)
     .eq("id", id)
     .eq("user_id", session.user.id)
@@ -302,6 +304,14 @@ export async function deleteTransaction(id: string) {
   if (!session) throw new Error("Unauthorized");
 
   const supabase = createAdminClient();
+  
+  // Get attachments before deleting transaction (CASCADE will delete them, but we need the drive_file_id)
+  const { data: attachments } = await supabase
+    .from("transaction_attachments")
+    .select("drive_file_id")
+    .eq("transaction_id", id);
+
+  // Delete transaction (CASCADE will delete attachments from DB)
   const { error } = await supabase
     .from("transactions")
     .delete()
@@ -309,6 +319,171 @@ export async function deleteTransaction(id: string) {
     .eq("user_id", session.user.id);
 
   if (error) throw new Error(error.message);
+
+  // Cleanup Google Drive files
+  if (attachments) {
+    for (const attachment of attachments) {
+      try {
+        await deleteFile(attachment.drive_file_id, session.user.id);
+      } catch (error) {
+        console.error(`Failed to delete Google Drive file ${attachment.drive_file_id}:`, error);
+      }
+    }
+  }
+}
+
+// Attachment management functions
+
+export async function linkAttachmentsToTransaction(
+  transactionId: string,
+  attachmentIds: string[]
+) {
+  const session = await getSession();
+  if (!session) throw new Error("Unauthorized");
+
+  if (!attachmentIds || attachmentIds.length === 0) {
+    return;
+  }
+
+  const supabase = createAdminClient();
+
+  // Verify transaction belongs to user
+  const { data: transaction, error: transactionError } = await supabase
+    .from("transactions")
+    .select("id")
+    .eq("id", transactionId)
+    .eq("user_id", session.user.id)
+    .single();
+
+  if (transactionError || !transaction) {
+    throw new Error("Transaction not found or access denied");
+  }
+
+  // Update attachments to link them to the transaction
+  const { error: updateError } = await supabase
+    .from("transaction_attachments")
+    .update({ transaction_id: transactionId })
+    .in("id", attachmentIds)
+    .is("transaction_id", null); // Only update unattached files
+
+  if (updateError) {
+    throw new Error(`Failed to link attachments: ${updateError.message}`);
+  }
+}
+
+export async function getTransactionAttachments(transactionId: string) {
+  const session = await getSession();
+  if (!session) throw new Error("Unauthorized");
+
+  const supabase = createAdminClient();
+
+  // Verify transaction belongs to user
+  const { data: transaction, error: transactionError } = await supabase
+    .from("transactions")
+    .select("id")
+    .eq("id", transactionId)
+    .eq("user_id", session.user.id)
+    .single();
+
+  if (transactionError || !transaction) {
+    throw new Error("Transaction not found or access denied");
+  }
+
+  // Get attachments
+  const { data, error } = await supabase
+    .from("transaction_attachments")
+    .select("*")
+    .eq("transaction_id", transactionId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+export async function deleteAttachment(attachmentId: string) {
+  const session = await getSession();
+  if (!session) throw new Error("Unauthorized");
+
+  const supabase = createAdminClient();
+
+  // Get attachment to verify ownership and get drive_file_id
+  const { data: attachment, error: fetchError } = await supabase
+    .from("transaction_attachments")
+    .select("drive_file_id, transaction_id")
+    .eq("id", attachmentId)
+    .single();
+
+  if (fetchError || !attachment) {
+    throw new Error("Attachment not found");
+  }
+
+  // Verify transaction belongs to user (if transaction_id is set)
+  if (attachment.transaction_id) {
+    const { data: transaction, error: transactionError } = await supabase
+      .from("transactions")
+      .select("id")
+      .eq("id", attachment.transaction_id)
+      .eq("user_id", session.user.id)
+      .single();
+
+    if (transactionError || !transaction) {
+      throw new Error("Access denied");
+    }
+  }
+
+  // Delete from database
+  const { error: deleteError } = await supabase
+    .from("transaction_attachments")
+    .delete()
+    .eq("id", attachmentId);
+
+  if (deleteError) {
+    throw new Error(`Failed to delete attachment: ${deleteError.message}`);
+  }
+
+  // Delete from Google Drive
+  try {
+    await deleteFile(attachment.drive_file_id, session.user.id);
+  } catch (error) {
+    console.error(`Failed to delete Google Drive file:`, error);
+    // Don't throw - file might already be deleted
+  }
+}
+
+export async function updateAttachmentTransactionId(
+  attachmentIds: string[],
+  transactionId: string
+) {
+  const session = await getSession();
+  if (!session) throw new Error("Unauthorized");
+
+  if (!attachmentIds || attachmentIds.length === 0) {
+    return;
+  }
+
+  const supabase = createAdminClient();
+
+  // Verify transaction belongs to user
+  const { data: transaction, error: transactionError } = await supabase
+    .from("transactions")
+    .select("id")
+    .eq("id", transactionId)
+    .eq("user_id", session.user.id)
+    .single();
+
+  if (transactionError || !transaction) {
+    throw new Error("Transaction not found or access denied");
+  }
+
+  // Update attachments
+  const { error: updateError } = await supabase
+    .from("transaction_attachments")
+    .update({ transaction_id: transactionId })
+    .in("id", attachmentIds);
+
+  if (updateError) {
+    throw new Error(`Failed to update attachments: ${updateError.message}`);
+  }
 }
 
 

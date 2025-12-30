@@ -9,6 +9,7 @@ import {
   createTransactionWithItems as serverCreateTransactionWithItems,
   updateTransaction as serverUpdateTransaction,
   deleteTransaction as serverDeleteTransaction,
+  linkAttachmentsToTransaction,
 } from "@/actions/transactions";
 import {
   generateIncomeLines,
@@ -79,7 +80,8 @@ export function useTransactions() {
     payee?: string,
     transactionId?: string,
     currency = "USD",
-    exchangeRate = 1.0
+    exchangeRate = 1.0,
+    attachmentIds?: string[]
   ) => {
     const totalAmount = lineItems.reduce((sum, item) => sum + item.amount, 0);
     const mainDescription =
@@ -111,6 +113,17 @@ export function useTransactions() {
         income_account_id: item.incomeAccountId,
       })),
     });
+    
+    // Link attachments if provided
+    if (attachmentIds && attachmentIds.length > 0 && transaction?.id) {
+      try {
+        await linkAttachmentsToTransaction(transaction.id, attachmentIds);
+      } catch (linkError) {
+        console.error("Failed to link attachments:", linkError);
+        throw new Error("Transaction created but failed to link attachments");
+      }
+    }
+    
     setTransactions((prev) => [transaction, ...prev]);
     return transaction;
   };
@@ -151,7 +164,8 @@ export function useTransactions() {
     payee?: string,
     transactionId?: string,
     currency = "USD",
-    exchangeRate = 1.0
+    exchangeRate = 1.0,
+    attachmentIds?: string[]
   ) => {
     const totalAmount = lineItems.reduce((sum, item) => sum + item.amount, 0);
     const mainDescription =
@@ -183,6 +197,17 @@ export function useTransactions() {
         expense_account_id: item.expenseAccountId,
       })),
     });
+    
+    // Link attachments if provided
+    if (attachmentIds && attachmentIds.length > 0 && transaction?.id) {
+      try {
+        await linkAttachmentsToTransaction(transaction.id, attachmentIds);
+      } catch (linkError) {
+        console.error("Failed to link attachments:", linkError);
+        throw new Error("Transaction created but failed to link attachments");
+      }
+    }
+    
     setTransactions((prev) => [transaction, ...prev]);
     return transaction;
   };
@@ -196,7 +221,8 @@ export function useTransactions() {
     feeAmount?: number,
     feeAccountId?: string,
     currency = "USD",
-    exchangeRate = 1.0
+    exchangeRate = 1.0,
+    attachmentIds?: string[]
   ) => {
     const lines = generateTransferLines(
       fromAccountId,
@@ -214,6 +240,17 @@ export function useTransactions() {
       exchange_rate: exchangeRate,
       lines,
     });
+    
+    // Link attachments if provided
+    if (attachmentIds && attachmentIds.length > 0 && transaction?.id) {
+      try {
+        await linkAttachmentsToTransaction(transaction.id, attachmentIds);
+      } catch (linkError) {
+        console.error("Failed to link attachments:", linkError);
+        throw new Error("Transaction created but failed to link attachments");
+      }
+    }
+    
     setTransactions((prev) => [transaction, ...prev]);
     return transaction;
   };

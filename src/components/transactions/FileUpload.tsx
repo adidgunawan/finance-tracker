@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { TrashIcon, UploadIcon, FileTextIcon } from "@radix-ui/react-icons";
+import { TrashIcon, UploadIcon, FileTextIcon, ExternalLinkIcon } from "@radix-ui/react-icons";
 import { Card } from "@/components/ui/card";
+import { getUserDriveTokens } from "@/actions/google-drive";
+import { useRouter } from "next/navigation";
 
 interface FileAttachment {
   id: string;
@@ -35,8 +37,23 @@ export function FileUpload({
 }: FileUploadProps) {
   const [uploading, setUploading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [driveConnected, setDriveConnected] = useState<boolean | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragActive, setDragActive] = useState(false);
+  const router = useRouter();
+
+  useEffect(() => {
+    checkDriveConnection();
+  }, []);
+
+  const checkDriveConnection = async () => {
+    try {
+      const tokens = await getUserDriveTokens();
+      setDriveConnected(!!tokens);
+    } catch (error) {
+      setDriveConnected(false);
+    }
+  };
 
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return bytes + " B";
@@ -45,6 +62,11 @@ export function FileUpload({
   };
 
   const uploadFile = async (file: File): Promise<FileAttachment> => {
+    // Check if Google Drive is connected
+    if (driveConnected === false) {
+      throw new Error("Google Drive not connected. Please connect your Google Drive account in Settings.");
+    }
+
     const formData = new FormData();
     formData.append("file", file);
 
@@ -55,7 +77,14 @@ export function FileUpload({
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || "Failed to upload file");
+      const errorMessage = error.error || "Failed to upload file";
+      
+      // If error mentions Google Drive not connected, update state
+      if (errorMessage.includes("Google Drive not connected") || errorMessage.includes("not connected")) {
+        setDriveConnected(false);
+      }
+      
+      throw new Error(errorMessage);
     }
 
     const data = await response.json();
@@ -155,6 +184,34 @@ export function FileUpload({
     }
   };
 
+  // Show connection prompt if not connected
+  if (driveConnected === false) {
+    return (
+      <div className="space-y-4">
+        <Card className="p-6 border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800">
+          <div className="space-y-3">
+            <div>
+              <h4 className="font-semibold text-amber-900 dark:text-amber-100">
+                Google Drive Not Connected
+              </h4>
+              <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                Connect your Google Drive account to upload files for transactions.
+              </p>
+            </div>
+            <Button
+              onClick={() => router.push("/settings")}
+              variant="default"
+              className="bg-amber-600 hover:bg-amber-700"
+            >
+              <ExternalLinkIcon className="h-4 w-4 mr-2" />
+              Go to Settings to Connect
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div
@@ -169,9 +226,9 @@ export function FileUpload({
               ? "border-primary bg-primary/5"
               : "border-muted-foreground/25 hover:border-muted-foreground/50"
           }
-          ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
+          ${disabled || driveConnected === null ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
         `}
-        onClick={() => !disabled && fileInputRef.current?.click()}
+        onClick={() => !disabled && driveConnected !== null && fileInputRef.current?.click()}
       >
         <input
           ref={fileInputRef}

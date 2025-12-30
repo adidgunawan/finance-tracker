@@ -27,6 +27,8 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import type { Database } from "@/lib/supabase/types";
 import { PlusIcon, TrashIcon } from "@radix-ui/react-icons";
+import { FileUpload } from "@/components/transactions/FileUpload";
+import { deleteAttachment } from "@/actions/transactions";
 
 type Account = Database["public"]["Tables"]["chart_of_accounts"]["Row"];
 
@@ -41,6 +43,16 @@ interface LineItem {
   incomeAccountId: string;
 }
 
+interface FileAttachment {
+  id: string;
+  filename: string;
+  mimeType: string;
+  fileSize: number;
+  driveWebViewLink: string;
+  driveDownloadLink: string;
+  preview?: string;
+}
+
 export function IncomeForm({ onSuccess }: IncomeFormProps) {
   const { getAccountsByType } = useAccounts();
   const { createIncomeWithItems } = useTransactions();
@@ -50,6 +62,7 @@ export function IncomeForm({ onSuccess }: IncomeFormProps) {
   const [assetAccountId, setAssetAccountId] = useState("");
   const [payee, setPayee] = useState("");
   const [transactionId, setTransactionId] = useState("");
+  const [attachments, setAttachments] = useState<FileAttachment[]>([]);
 
   const [lineItems, setLineItems] = useState<LineItem[]>([
     { id: "1", description: "", amount: "", incomeAccountId: "" },
@@ -113,6 +126,8 @@ export function IncomeForm({ onSuccess }: IncomeFormProps) {
     }
 
     setLoading(true);
+    const attachmentIds = attachments.map((att) => att.id);
+    
     try {
       await createIncomeWithItems(
         date,
@@ -123,18 +138,32 @@ export function IncomeForm({ onSuccess }: IncomeFormProps) {
         })),
         assetAccountId,
         payee || undefined,
-        transactionId || undefined
+        transactionId || undefined,
+        undefined, // currency
+        undefined, // exchangeRate
+        attachmentIds.length > 0 ? attachmentIds : undefined
       );
 
       // Reset form
       setLineItems([{ id: "1", description: "", amount: "", incomeAccountId: "" }]);
       setPayee("");
       setTransactionId("");
+      setAttachments([]);
       setDate(format(new Date(), "yyyy-MM-dd"));
 
       toast.success("Income transaction created successfully");
       onSuccess?.();
     } catch (error) {
+      // Cleanup uploaded files if transaction creation or linking fails
+      if (attachmentIds.length > 0) {
+        for (const attachmentId of attachmentIds) {
+          try {
+            await deleteAttachment(attachmentId);
+          } catch (cleanupError) {
+            console.error("Failed to cleanup attachment:", cleanupError);
+          }
+        }
+      }
       toast.error(error instanceof Error ? error.message : "Failed to create income");
     } finally {
       setLoading(false);
@@ -289,6 +318,15 @@ export function IncomeForm({ onSuccess }: IncomeFormProps) {
           <PlusIcon className="h-4 w-4 mr-2" />
           Add Line Item
         </Button>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Attachments (Optional)</Label>
+        <FileUpload
+          attachments={attachments}
+          onFilesChange={setAttachments}
+          disabled={loading}
+        />
       </div>
 
       <div className="flex justify-end gap-2 pt-4">

@@ -1,12 +1,16 @@
 # Google Drive Setup Guide
 
-This guide explains how to set up Google Drive integration for transaction file attachments.
+This guide explains how to set up Google Drive integration for transaction file attachments using OAuth 2.0.
+
+## Overview
+
+The application uses OAuth 2.0 to allow users to connect their personal Google Drive accounts. Files are uploaded directly to each user's Google Drive, ensuring proper storage quota and ownership.
 
 ## Prerequisites
 
 1. A Google Cloud Project
 2. Google Drive API enabled
-3. A service account with Drive API access
+3. OAuth 2.0 credentials configured
 
 ## Step-by-Step Setup
 
@@ -22,66 +26,91 @@ This guide explains how to set up Google Drive integration for transaction file 
 2. Search for "Google Drive API"
 3. Click on it and press **Enable**
 
-### 3. Create a Service Account
+### 3. Configure OAuth Consent Screen
+
+**IMPORTANT:** You must configure the OAuth consent screen BEFORE creating OAuth credentials.
+
+1. Navigate to **APIs & Services** > **OAuth consent screen**
+2. Choose **External** (unless you have a Google Workspace account)
+3. Fill in the required information:
+   - **App name**: Finance Tracker (or your app name)
+   - **User support email**: Your email
+   - **Developer contact information**: Your email
+4. Click **Save and Continue**
+5. **Add Scopes** (this is where you configure scopes):
+   - Click **Add or Remove Scopes**
+   - In the filter/search box, type: `drive.file`
+   - Select: `https://www.googleapis.com/auth/drive.file` (See, edit, create, and delete only the specific Google Drive files you use with this app)
+   - Click **Update**
+   - Click **Save and Continue**
+6. **IMPORTANT: Add Test Users** (REQUIRED - even for developers):
+   - **You MUST add yourself as a test user, even though you're the developer!**
+   - Click **Add Users** or **+ Add Users**
+   - Enter your Google account email (the one you'll use to sign in)
+   - Click **Add**
+   - You can add multiple test users if needed
+   - Click **Save and Continue**
+   - **Note:** Without adding test users, you'll get "Access blocked" error even as the developer
+7. Review and click **Back to Dashboard**
+
+### 4. Create OAuth 2.0 Credentials
 
 1. Navigate to **APIs & Services** > **Credentials**
-2. Click **Create Credentials** > **Service Account**
-3. Fill in the service account details:
-   - **Name**: `finance-tracker-drive` (or any name you prefer)
-   - **Description**: Service account for Finance Tracker file storage
-4. Click **Create and Continue**
-5. Skip the optional steps and click **Done**
+2. Click **Create Credentials** > **OAuth client ID**
+3. Configure the OAuth client:
+   - **Application type**: Web application
+   - **Name**: Finance Tracker Web Client (or any name)
+   - **Authorized redirect URIs**: 
+     - For development: `http://localhost:3000/api/auth/google/callback`
+     - For production: `https://yourdomain.com/api/auth/google/callback`
+     - Click **+ Add URI** for each URI you need
+   - Click **Create**
+   - **Copy the Client ID and Client Secret** - you'll need these
 
-### 4. Create and Download Service Account Key
+### 4. Configure Environment Variables
 
-1. In the **Credentials** page, find your service account
-2. Click on the service account email
-3. Go to the **Keys** tab
-4. Click **Add Key** > **Create new key**
-5. Select **JSON** format
-6. Click **Create** - this will download a JSON file
-
-### 5. Extract Credentials from JSON
-
-Open the downloaded JSON file. You'll need:
-
-- `client_email` - This is your `GOOGLE_DRIVE_SERVICE_ACCOUNT_EMAIL`
-- `private_key` - This is your `GOOGLE_DRIVE_SERVICE_ACCOUNT_PRIVATE_KEY`
-
-**Important:** The private key is a multi-line string. You have two options:
-
-#### Option 1: Use Raw Private Key (Recommended)
-Copy the entire `private_key` value from the JSON (including the `-----BEGIN PRIVATE KEY-----` and `-----END PRIVATE KEY-----` markers) and paste it into your `.env.local` file. In `.env` files, you need to escape newlines:
+Add these to your `.env.local` file:
 
 ```env
-GOOGLE_DRIVE_SERVICE_ACCOUNT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC...\n-----END PRIVATE KEY-----\n"
+# Google Drive OAuth 2.0
+# You can use either naming convention:
+GOOGLE_CLIENT_ID=your-oauth-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-oauth-client-secret
+
+# OR use the Drive-specific names:
+# GOOGLE_DRIVE_CLIENT_ID=your-oauth-client-id.apps.googleusercontent.com
+# GOOGLE_DRIVE_CLIENT_SECRET=your-oauth-client-secret
+
+# Optional: Custom redirect URI (defaults to /api/auth/google/callback)
+GOOGLE_DRIVE_REDIRECT_URI=http://localhost:3000/api/auth/google/callback
 ```
 
-**Note:** Replace actual newlines with `\n` in the `.env` file.
+**Note:** The code supports both `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` and `GOOGLE_DRIVE_CLIENT_ID`/`GOOGLE_DRIVE_CLIENT_SECRET` naming conventions. Use whichever you prefer.
 
-#### Option 2: Base64 Encode the Private Key
-If you prefer, you can base64 encode the entire private key (including BEGIN/END markers) and store it:
+**For production**, update `GOOGLE_DRIVE_REDIRECT_URI` to your production URL.
 
-```bash
-# On Linux/Mac
-cat service-account-key.json | jq -r '.private_key' | base64
+### 5. User Connection Flow
 
-# Then in .env.local
-GOOGLE_DRIVE_SERVICE_ACCOUNT_PRIVATE_KEY="<base64-encoded-string>"
-```
+Once the OAuth credentials are configured:
 
-The application will automatically detect and decode base64-encoded keys.
+1. Users go to **Settings** page
+2. Click **Connect Google Drive** button
+3. They'll be redirected to Google to authorize the application
+4. After authorization, they'll be redirected back to the app
+5. Files can now be uploaded to their Google Drive
 
-### 6. Set Up Folder Structure (Optional)
+## How It Works
 
-If you want to organize files in a specific folder:
+- Each user connects their own Google Drive account
+- Files are uploaded to: `Finance Tracker/Users/{userId}/Transactions/{transactionId}/`
+- Files are owned by the user (not the service account)
+- No storage quota issues since files use the user's quota
+- Users can disconnect at any time from Settings
 
-1. Create a folder in Google Drive (or use an existing one)
-2. Share the folder with your service account email (give it "Editor" access)
-3. Get the folder ID from the URL: `https://drive.google.com/drive/folders/FOLDER_ID_HERE`
-4. Set `GOOGLE_DRIVE_FOLDER_ID` to this folder ID
+## Folder Structure
 
-If you don't set this, files will be organized in:
+Files are organized in the user's Google Drive as follows:
+
 ```
 Finance Tracker/
   └── Users/
@@ -91,92 +120,52 @@ Finance Tracker/
                   └── {filename}
 ```
 
-### 7. Configure Environment Variables
+## Security Considerations
 
-#### Easy Method: Use the Helper Script (Recommended)
-
-We've provided a helper script to automatically format your private key:
-
-```bash
-# Option 1: Provide the JSON file path
-node scripts/format-private-key.js path/to/your-service-account.json
-
-# Option 2: Run without arguments and paste the JSON when prompted
-node scripts/format-private-key.js
-```
-
-The script will output the correctly formatted environment variables that you can copy directly into your `.env.local` file.
-
-#### Manual Method
-
-If you prefer to do it manually, add these to your `.env.local` file:
-
-```env
-# Google Drive Service Account
-GOOGLE_DRIVE_SERVICE_ACCOUNT_EMAIL=your-service-account@project-id.iam.gserviceaccount.com
-GOOGLE_DRIVE_SERVICE_ACCOUNT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC...\n-----END PRIVATE KEY-----\n"
-GOOGLE_DRIVE_FOLDER_ID=optional-folder-id-here
-```
-
-**Critical Notes:**
-- The private key **must** include the `-----BEGIN PRIVATE KEY-----` and `-----END PRIVATE KEY-----` markers
-- In `.env` files, you **must** replace actual newlines with `\n` (backslash-n)
-- The entire key should be on one line in the `.env` file, with `\n` representing line breaks
-- If you get an "ERR_OSSL_UNSUPPORTED" error, it means the private key format is incorrect
-- You can also use base64 encoding - the service will auto-detect and decode it
-
-**Common Mistakes:**
-- ❌ Using actual line breaks in the .env file (will break)
-- ❌ Forgetting to escape newlines (should be `\n`, not actual newlines)
-- ❌ Missing the BEGIN/END markers
-- ❌ Copying only part of the key
-- ✅ Using the helper script (recommended)
-
-### 8. Share Drive Folder with Service Account (If Using Custom Folder)
-
-If you set `GOOGLE_DRIVE_FOLDER_ID`, make sure to:
-1. Open the folder in Google Drive
-2. Click **Share**
-3. Add your service account email
-4. Give it **Editor** permissions
-5. Click **Send**
-
-### 9. File Permissions
-
-The service automatically makes uploaded files accessible to anyone with the link. This allows:
-- Viewing images in the application
-- Downloading PDFs
-- Accessing files via the web view links
-
-Files are organized per user and transaction for easy management.
+1. **OAuth Tokens**: Stored securely in the database with RLS policies
+2. **Token Refresh**: Tokens are automatically refreshed before expiration
+3. **User Isolation**: Each user can only access their own files
+4. **Revocation**: Users can disconnect their Google Drive at any time
 
 ## Troubleshooting
 
-### Error: "GOOGLE_DRIVE_SERVICE_ACCOUNT_EMAIL is not set"
-- Make sure you've added the environment variable to `.env.local`
-- Restart your development server after adding environment variables
+### Error: "Access blocked: App has not completed the Google verification process"
+**This is the most common error!** Even if you're the developer, you MUST add yourself as a test user:
 
-### Error: "Failed to upload file to Google Drive"
-- Check that the Google Drive API is enabled in your Google Cloud project
-- Verify the service account has the correct permissions
-- Check that the private key is correctly formatted
+1. Go to **APIs & Services** > **OAuth consent screen** in Google Cloud Console
+2. Scroll down to the **Test users** section
+3. Click **+ Add Users** or **Add Users**
+4. Enter your Google account email (the exact email you're using to sign in: `adidharmagunawan@gmail.com`)
+5. Click **Add**
+6. Click **Save** (if there's a save button)
+7. Wait a few seconds, then try connecting again
+
+**Why this happens:** Until your app is verified by Google (which requires publishing to production), only explicitly added test users can access the app - **even the developer needs to be added as a test user!**
+
+### Error: "Google Drive not connected"
+- User needs to connect their Google Drive account in Settings
+- Click "Connect Google Drive" and complete the OAuth flow
+- Make sure the user is added as a test user in OAuth consent screen (see above)
+
+### Error: "Failed to refresh access token"
+- User may need to reconnect their Google Drive account
+- Go to Settings and disconnect, then reconnect
+
+### Error: "OAuth client not configured"
+- Make sure `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set
+- Verify the redirect URI matches in both `.env.local` and Google Cloud Console
 
 ### Files not appearing in Google Drive
-- Check the folder structure in your Drive
-- Verify the service account has access to the folder (if using `GOOGLE_DRIVE_FOLDER_ID`)
-- Check server logs for any error messages
+- Check the folder structure in your Google Drive
+- Look for "Finance Tracker" folder in the root of your Drive
+- Verify the file was uploaded successfully (check transaction details)
 
-### Permission Denied Errors
-- Ensure the service account has "Editor" access to the root folder (if specified)
-- Verify the Google Drive API is enabled
-- Check that the service account key hasn't been revoked
+## Disconnecting Google Drive
 
-## Security Considerations
-
-1. **Never commit** the service account JSON file or private key to version control
-2. Keep your `.env.local` file secure and never share it
-3. The service account should only have Drive API access (minimal permissions)
-4. Files are automatically shared with "anyone with the link" for viewing - this is necessary for the application to display them
+Users can disconnect their Google Drive at any time:
+1. Go to Settings page
+2. Click "Disconnect" in the Google Drive section
+3. This will revoke the OAuth tokens and prevent further uploads
 
 ## File Limits
 
@@ -185,4 +174,3 @@ Files are organized per user and transaction for easy management.
   - Images: JPG, PNG, GIF, WEBP
   - Documents: PDF
 - Maximum files per transaction: 10 (configurable in FileUpload component)
-
