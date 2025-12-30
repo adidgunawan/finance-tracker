@@ -299,6 +299,94 @@ export async function updateTransaction(id: string, data: Partial<CreateTransact
   return transaction;
 }
 
+interface UpdateTransactionWithItemsData extends Partial<CreateTransactionData> {
+  lineItems?: Array<{
+    description: string;
+    amount: number;
+    expense_account_id?: string;
+    income_account_id?: string;
+  }>;
+}
+
+export async function updateTransactionWithItems(id: string, data: UpdateTransactionWithItemsData) {
+  const session = await getSession();
+  if (!session) throw new Error("Unauthorized");
+
+  const supabase = createAdminClient();
+
+  // Update transaction basic fields
+  const updateData: any = {};
+  if (data.transaction_date !== undefined) updateData.transaction_date = data.transaction_date;
+  if (data.transaction_id !== undefined) updateData.transaction_id = data.transaction_id;
+  if (data.description !== undefined) updateData.description = data.description;
+  if (data.amount !== undefined) updateData.amount = data.amount;
+  if (data.currency !== undefined) updateData.currency = data.currency;
+  if (data.exchange_rate !== undefined) updateData.exchange_rate = data.exchange_rate;
+  if (data.payee_payer !== undefined) updateData.payee_payer = data.payee_payer;
+  updateData.updated_at = new Date().toISOString();
+
+  const { data: transaction, error: transactionError } = await supabase
+    .from("transactions")
+    .update(updateData)
+    .eq("id", id)
+    .eq("user_id", session.user.id)
+    .select()
+    .single();
+
+  if (transactionError) throw new Error(transactionError.message);
+
+  // Update lines if provided
+  if (data.lines) {
+    // Validate balance
+    if (!validateBalance(data.lines)) {
+      throw new Error("Transaction is not balanced");
+    }
+
+    // Delete existing lines
+    await supabase.from("transaction_lines").delete().eq("transaction_id", id);
+
+    // Insert new lines
+    const lines = data.lines.map((line) => ({
+      ...line,
+      transaction_id: id,
+    }));
+
+    const { error: linesError } = await supabase
+      .from("transaction_lines")
+      .insert(lines);
+
+    if (linesError) throw new Error(linesError.message);
+  }
+
+  // Update line items if provided
+  if (data.lineItems !== undefined) {
+    // Delete existing line items
+    await supabase.from("transaction_line_items").delete().eq("transaction_id", id);
+
+    // Insert new line items if any
+    if (data.lineItems.length > 0) {
+      const lineItems = data.lineItems.map((item) => ({
+        transaction_id: id,
+        description: item.description,
+        amount: item.amount,
+        expense_account_id: item.expense_account_id || null,
+        income_account_id: item.income_account_id || null,
+      }));
+
+      const { error: itemsError } = await supabase
+        .from("transaction_line_items")
+        .insert(lineItems);
+
+      if (itemsError) {
+        console.error("Failed to update line items:", itemsError);
+        throw new Error(`Failed to update line items: ${itemsError.message}`);
+      }
+    }
+  }
+
+  return transaction;
+}
+
 export async function deleteTransaction(id: string) {
   const session = await getSession();
   if (!session) throw new Error("Unauthorized");

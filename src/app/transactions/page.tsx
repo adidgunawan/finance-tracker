@@ -24,7 +24,7 @@ import { TransactionDetailDialog } from "@/components/transactions/TransactionDe
 import { EditTransactionDialog } from "@/components/transactions/EditTransactionDialog";
 
 export default function TransactionsPage() {
-  const { transactions, loading, error, deleteTransaction, getTransaction, updateTransaction } = useTransactions();
+  const { transactions, loading, error, deleteTransaction, getTransaction, refreshTransactions } = useTransactions();
   const { format: formatCurrency } = useCurrency();
   const [activeTab, setActiveTab] = useState("list");
   const [detailOpen, setDetailOpen] = useState(false);
@@ -50,14 +50,10 @@ export default function TransactionsPage() {
     setEditOpen(true);
   };
 
-  const handleSaveEdit = async (id: string, data: any) => {
-    try {
-      await updateTransaction(id, data);
-      setEditOpen(false);
-      setSelectedTransaction(null);
-    } catch (error) {
-      throw error;
-    }
+  const handleSaveEdit = async () => {
+    // The EditTransactionDialog now handles the save internally
+    // This callback is just for refreshing the transaction list
+    // We'll fetch transactions again through the hook's refresh
   };
 
   const handleDelete = async (id: string) => {
@@ -294,7 +290,13 @@ export default function TransactionsPage() {
 
         <EditTransactionDialog
           open={editOpen}
-          onOpenChange={setEditOpen}
+          onOpenChange={(open) => {
+            setEditOpen(open);
+            if (!open) {
+              setSelectedTransaction(null);
+              refreshTransactions();
+            }
+          }}
           transaction={selectedTransaction}
           onSave={handleSaveEdit}
         />
