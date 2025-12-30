@@ -9,6 +9,7 @@ import {
   LayersIcon,
   BarChartIcon,
   TargetIcon,
+  UpdateIcon,
 } from "@radix-ui/react-icons";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,7 @@ const navigation = [
   { name: "Dashboard", href: "/", icon: HomeIcon },
   { name: "Transactions", href: "/transactions", icon: FileTextIcon },
   { name: "Accounts", href: "/accounts", icon: LayersIcon },
+  { name: "Reconcile", href: "/reconcile", icon: UpdateIcon },
   { name: "Reports", href: "/reports", icon: BarChartIcon },
   { name: "Budgets", href: "/budgets", icon: TargetIcon },
 ];
