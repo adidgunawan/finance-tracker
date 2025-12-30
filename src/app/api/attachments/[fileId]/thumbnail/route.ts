@@ -4,7 +4,7 @@ import { getDriveClientForUser, getUserDriveTokens } from "@/lib/google-drive-oa
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ fileId: string }> | { fileId: string } }
+  { params }: { params: Promise<{ fileId: string }> }
 ) {
   try {
     const session = await auth.api.getSession({
@@ -15,8 +15,8 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Handle both Promise and direct params (Next.js 13+ vs 14+)
-    const resolvedParams = params instanceof Promise ? await params : params;
+    // Next.js 15: params is always a Promise
+    const resolvedParams = await params;
     const fileId = resolvedParams.fileId;
     if (!fileId) {
       return NextResponse.json({ error: "File ID required" }, { status: 400 });
@@ -91,7 +91,7 @@ export async function GET(
     console.error("Error fetching thumbnail:", error);
     // Try to get fileId from params for fallback
     try {
-      const resolvedParams = params instanceof Promise ? await params : params;
+      const resolvedParams = await params;
       const fileId = resolvedParams.fileId;
       if (fileId) {
         return NextResponse.redirect(

@@ -64,7 +64,7 @@ export async function middleware(request: NextRequest) {
   }
   
   try {
-    const { data: session } = await betterFetch<Session>(
+    const sessionResponse = await betterFetch<Session>(
       "/api/auth/get-session",
       {
         baseURL: request.nextUrl.origin,
@@ -74,6 +74,8 @@ export async function middleware(request: NextRequest) {
         },
       },
     );
+
+    const session = sessionResponse.data;
 
     // If no session and not on auth route, redirect to login IMMEDIATELY
     // This must happen before any page rendering
@@ -87,19 +89,22 @@ export async function middleware(request: NextRequest) {
     }
 
     // If there's a session, check if user is authorized
-    if (session) {
+    // The session from betterFetch might have a different structure
+    const sessionWithUser = session as any;
+    
+    if (sessionWithUser && sessionWithUser.user) {
       // Get email from session - try multiple possible locations
-      let userEmail = (session.user as any)?.email;
+      let userEmail = sessionWithUser.user?.email;
       
       // If email not in session, try to fetch from our API endpoint
-      if (!userEmail && session.user?.id) {
+      if (!userEmail && sessionWithUser.user?.id) {
         const cookie = request.headers.get("cookie") || "";
-        userEmail = await getUserEmailFromAPI(session.user.id, request.nextUrl.origin, cookie);
+        userEmail = await getUserEmailFromAPI(sessionWithUser.user.id, request.nextUrl.origin, cookie);
       }
       
       // If we still don't have an email, deny access (fail-secure)
       if (!userEmail) {
-        console.log(`[Middleware] No email found for user ${session.user?.id}, denying access`);
+        console.log(`[Middleware] No email found for user ${sessionWithUser.user?.id}, denying access`);
         const response = NextResponse.redirect(new URL("/login?unauthorized=true", request.url));
         response.cookies.set("better-auth.session_token", "", { maxAge: 0, path: "/" });
         response.cookies.set("better-auth.session", "", { maxAge: 0, path: "/" });

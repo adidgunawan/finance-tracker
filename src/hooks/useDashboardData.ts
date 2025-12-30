@@ -58,13 +58,14 @@ export function useDashboardData() {
       if (transError) throw transError;
 
       // Calculate current month totals
-      const income = transactions
-        ?.filter((t) => t.type === "income")
-        .reduce((sum, t) => sum + t.amount, 0) || 0;
+      const typedTransactions = (transactions || []) as Transaction[];
+      const income = typedTransactions
+        .filter((t) => t.type === "income")
+        .reduce((sum, t) => sum + t.amount, 0);
 
-      const expense = transactions
-        ?.filter((t) => t.type === "expense")
-        .reduce((sum, t) => sum + t.amount, 0) || 0;
+      const expense = typedTransactions
+        .filter((t) => t.type === "expense")
+        .reduce((sum, t) => sum + t.amount, 0);
 
       // Fetch last 6 months data
       const sixMonthsAgo = subMonths(new Date(), 5);
@@ -75,6 +76,8 @@ export function useDashboardData() {
 
       if (allTransError) throw allTransError;
 
+      const typedAllTransactions = (allTransactions || []) as Transaction[];
+
       // Group by month
       const monthlyMap = new Map<string, { income: number; expense: number }>();
       
@@ -84,7 +87,7 @@ export function useDashboardData() {
         monthlyMap.set(monthKey, { income: 0, expense: 0 });
       }
 
-      allTransactions?.forEach((t) => {
+      typedAllTransactions.forEach((t) => {
         const monthKey = format(new Date(t.transaction_date), "MMM yyyy");
         const existing = monthlyMap.get(monthKey);
         if (existing) {
@@ -118,8 +121,10 @@ export function useDashboardData() {
       if (linesError) throw linesError;
 
       // Calculate balance for each asset account
-      const assetBalances = accounts?.map((account) => {
-        const accountLines = lines?.filter((l) => l.account_id === account.id) || [];
+      const typedAccounts = (accounts || []) as Account[];
+      const typedLines = (lines || []) as TransactionLine[];
+      const assetBalances = typedAccounts.map((account) => {
+        const accountLines = typedLines.filter((l) => l.account_id === account.id);
         const totalDebits = accountLines.reduce((sum, l) => sum + (l.debit_amount || 0), 0);
         const totalCredits = accountLines.reduce((sum, l) => sum + (l.credit_amount || 0), 0);
         const balance = totalDebits - totalCredits; // Assets increase with debits
@@ -128,7 +133,7 @@ export function useDashboardData() {
           name: account.name,
           value: balance,
         };
-      }).filter((a) => a.value > 0) || [];
+      }).filter((a) => a.value > 0);
 
       setData({
         totalIncome: income,

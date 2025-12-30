@@ -253,6 +253,111 @@ export type Database = {
           },
         ]
       }
+      transaction_line_items: {
+        Row: {
+          id: string
+          transaction_id: string
+          description: string
+          amount: number
+          expense_account_id: string | null
+          income_account_id: string | null
+          quantity: number | null
+          unit_price: number | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          transaction_id: string
+          description: string
+          amount: number
+          expense_account_id?: string | null
+          income_account_id?: string | null
+          quantity?: number | null
+          unit_price?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          transaction_id?: string
+          description?: string
+          amount?: number
+          expense_account_id?: string | null
+          income_account_id?: string | null
+          quantity?: number | null
+          unit_price?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transaction_line_items_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_line_items_expense_account_id_fkey"
+            columns: ["expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_line_items_income_account_id_fkey"
+            columns: ["income_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transaction_attachments: {
+        Row: {
+          id: string
+          transaction_id: string | null
+          filename: string
+          mime_type: string
+          file_size: number
+          drive_file_id: string
+          drive_web_view_link: string
+          drive_download_link: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          transaction_id?: string | null
+          filename: string
+          mime_type: string
+          file_size: number
+          drive_file_id: string
+          drive_web_view_link: string
+          drive_download_link: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          transaction_id?: string | null
+          filename?: string
+          mime_type?: string
+          file_size?: number
+          drive_file_id?: string
+          drive_web_view_link?: string
+          drive_download_link?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transaction_attachments_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transaction_tags: {
         Row: {
           color: string | null
@@ -280,6 +385,44 @@ export type Database = {
             foreignKeyName: "transaction_tags_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
+            referencedRelation: "user"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      google_drive_tokens: {
+        Row: {
+          id: string
+          user_id: string
+          access_token: string
+          refresh_token: string
+          expires_at: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          access_token: string
+          refresh_token: string
+          expires_at: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          access_token?: string
+          refresh_token?: string
+          expires_at?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_drive_tokens_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
             referencedRelation: "user"
             referencedColumns: ["id"]
           },
