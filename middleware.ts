@@ -124,10 +124,17 @@ export async function middleware(request: NextRequest) {
       }
       
       console.log(`[Middleware] User ${userEmail} is authorized`);
+      
+      // If session exists and user is authorized, allow request through
+      // Pass email through headers to AuthGuard to avoid redundant DB query
+      const response = NextResponse.next();
+      response.headers.set("x-pathname", request.nextUrl.pathname);
+      response.headers.set("x-user-email", userEmail); // Pass email to AuthGuard
+      return response;
     }
-
-    // If session exists and user is authorized, allow request through
-    // Add pathname to headers for AuthGuard
+    
+    // If we reach here, session exists but no user email was found
+    // This shouldn't happen, but handle it safely
     const response = NextResponse.next();
     response.headers.set("x-pathname", request.nextUrl.pathname);
     return response;

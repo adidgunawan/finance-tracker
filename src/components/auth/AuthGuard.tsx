@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { isEmailAllowed } from "@/lib/auth-utils";
-import { Pool } from "pg";
+import { dbPool } from "@/lib/auth";
 
 export async function AuthGuard({ children }: { children: React.ReactNode }) {
   // AuthGuard should only be used in protected route groups
@@ -18,6 +18,25 @@ export async function AuthGuard({ children }: { children: React.ReactNode }) {
   }
 
   try {
+    // Check if middleware already verified and passed email through headers
+    const middlewareEmail = headersList.get("x-user-email");
+    
+    if (middlewareEmail) {
+      // Middleware already checked authorization, just verify session exists
+      const session = await auth.api.getSession({
+        headers: headersList,
+      });
+
+      if (!session?.user) {
+        redirect("/login");
+      }
+
+      // Middleware already verified email and authorization, proceed
+      return <>{children}</>;
+    }
+
+    // Fallback: if middleware didn't pass email (shouldn't happen in normal flow)
+    // Perform full check for safety
     const session = await auth.api.getSession({
       headers: headersList,
     });
@@ -30,12 +49,8 @@ export async function AuthGuard({ children }: { children: React.ReactNode }) {
     // Get user email from session or database
     let userEmail = (session.user as any)?.email;
 
-    // If email not in session, query database
+    // If email not in session, query database using shared pool
     if (!userEmail && session.user?.id) {
-      const dbPool = new Pool({
-        connectionString: process.env.DATABASE_URL,
-      });
-
       try {
         const result = await dbPool.query(
           'SELECT email FROM "user" WHERE id = $1',
@@ -45,8 +60,9 @@ export async function AuthGuard({ children }: { children: React.ReactNode }) {
         if (result.rows.length > 0) {
           userEmail = result.rows[0].email;
         }
-      } finally {
-        await dbPool.end();
+      } catch (dbError) {
+        console.error("AuthGuard database query error:", dbError);
+        // Don't fail the request, just log the error
       }
     }
 

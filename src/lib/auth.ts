@@ -16,7 +16,8 @@ if (!process.env.DATABASE_URL) {
 }
 
 // Create database pool with error handling
-let dbPool: Pool;
+// Export it so AuthGuard can reuse it instead of creating new connections
+export let dbPool: Pool;
 try {
   dbPool = new Pool({
     connectionString: process.env.DATABASE_URL,
