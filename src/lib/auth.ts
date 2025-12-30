@@ -1,5 +1,6 @@
 import { betterAuth } from "better-auth";
 import { Pool } from "pg";
+import { isEmailAllowed } from "./auth-utils";
 
 // Validate required environment variables
 if (!process.env.BETTER_AUTH_SECRET) {
@@ -42,6 +43,22 @@ export const auth = betterAuth({
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    },
+  },
+  hooks: {
+    onBeforeUserCreate: async ({ user }) => {
+      // Check if user email is in the allowed list before creating user
+      const email = user?.email;
+      
+      if (!email) {
+        throw new Error("Email not found in authentication data");
+      }
+      
+      if (!isEmailAllowed(email)) {
+        throw new Error("EMAIL_NOT_AUTHORIZED");
+      }
+      
+      return { user };
     },
   },
 });

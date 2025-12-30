@@ -77,6 +77,12 @@ A personal finance web application built with correct accounting principles and 
    - Required variables:
      - `NEXT_PUBLIC_SUPABASE_URL`
      - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+     - `BETTER_AUTH_SECRET` - Secret key for better-auth
+     - `DATABASE_URL` - PostgreSQL connection string
+     - `GOOGLE_CLIENT_ID` - Google OAuth client ID
+     - `GOOGLE_CLIENT_SECRET` - Google OAuth client secret
+     - `ALLOWED_USER_EMAILS` - Comma-separated list of allowed email addresses (e.g., `user1@example.com,user2@example.com`). Only users with emails in this list can log in. If not set, all logins will be denied (fail-secure).
+       - **Important**: All users (including existing users) must have their email addresses in this list to be able to log in. Make sure to add existing user emails to the whitelist before enabling this feature.
 
 4. Run database migrations:
    - Execute the SQL in `supabase/migrations/001_initial_schema.sql` in your Supabase SQL editor

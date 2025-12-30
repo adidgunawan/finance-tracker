@@ -46,6 +46,17 @@ export async function POST(req: NextRequest) {
       name: error.name,
     });
     
+    // Handle authorization errors specifically
+    if (error.message === "EMAIL_NOT_AUTHORIZED") {
+      return NextResponse.json(
+        { 
+          error: "EMAIL_NOT_AUTHORIZED",
+          message: "Your email is not authorized to access this application. Please contact the administrator.",
+        },
+        { status: 403 }
+      );
+    }
+    
     // Return error response that client can read
     return NextResponse.json(
       { 
