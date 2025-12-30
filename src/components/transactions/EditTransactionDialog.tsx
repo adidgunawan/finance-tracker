@@ -23,6 +23,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { FileUpload } from "@/components/transactions/FileUpload";
 import { getTransactionAttachments, deleteAttachment, linkAttachmentsToTransaction } from "@/actions/transactions";
+import { getDriveThumbnailUrl } from "@/lib/utils/google-drive";
 
 type Transaction = Database["public"]["Tables"]["transactions"]["Row"];
 
@@ -91,9 +92,12 @@ export function EditTransactionDialog({
           filename: att.filename,
           mimeType: att.mime_type,
           fileSize: att.file_size,
+          driveFileId: att.drive_file_id,
           driveWebViewLink: att.drive_web_view_link,
           driveDownloadLink: att.drive_download_link,
-          preview: att.mime_type.startsWith("image/") ? att.drive_web_view_link : undefined,
+          preview: att.mime_type.startsWith("image/") && att.drive_file_id
+            ? getDriveThumbnailUrl(att.drive_file_id)
+            : undefined,
         }))
       );
     } catch (error) {

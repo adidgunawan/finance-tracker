@@ -4,14 +4,17 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { TrashIcon, UploadIcon, FileTextIcon, ExternalLinkIcon } from "@radix-ui/react-icons";
 import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { getUserDriveTokens } from "@/actions/google-drive";
 import { useRouter } from "next/navigation";
+import { getDriveThumbnailUrl } from "@/lib/utils/google-drive";
 
 interface FileAttachment {
   id: string;
   filename: string;
   mimeType: string;
   fileSize: number;
+  driveFileId?: string;
   driveWebViewLink: string;
   driveDownloadLink: string;
   preview?: string; // For images
@@ -35,7 +38,7 @@ export function FileUpload({
   maxFiles = 10,
   disabled = false,
 }: FileUploadProps) {
-  const [uploading, setUploading] = useState<string | null>(null);
+  const [uploading, setUploading] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [driveConnected, setDriveConnected] = useState<boolean | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -93,10 +96,11 @@ export function FileUpload({
       filename: data.filename,
       mimeType: data.mimeType,
       fileSize: data.fileSize,
+      driveFileId: data.driveFileId,
       driveWebViewLink: data.driveWebViewLink,
       driveDownloadLink: data.driveDownloadLink,
-      preview: ALLOWED_IMAGE_TYPES.includes(data.mimeType)
-        ? data.driveWebViewLink
+      preview: ALLOWED_IMAGE_TYPES.includes(data.mimeType) && data.driveFileId
+        ? getDriveThumbnailUrl(data.driveFileId)
         : undefined,
     };
   };
@@ -132,17 +136,25 @@ export function FileUpload({
       const newAttachments: FileAttachment[] = [];
       for (const file of fileArray) {
         try {
-          setUploading(file.name);
+          setUploading((prev) => new Set(prev).add(file.name));
           const attachment = await uploadFile(file);
           newAttachments.push(attachment);
+          setUploading((prev) => {
+            const next = new Set(prev);
+            next.delete(file.name);
+            return next;
+          });
         } catch (err) {
           setError(err instanceof Error ? err.message : "Failed to upload file");
-          setUploading(null);
+          setUploading((prev) => {
+            const next = new Set(prev);
+            next.delete(file.name);
+            return next;
+          });
           return;
         }
       }
 
-      setUploading(null);
       onFilesChange([...attachments, ...newAttachments]);
     },
     [attachments, maxFiles, onFilesChange]
@@ -236,14 +248,16 @@ export function FileUpload({
           multiple
           accept={ALLOWED_TYPES.join(",")}
           onChange={handleInputChange}
-          disabled={disabled || uploading !== null}
+          disabled={disabled || uploading.size > 0}
           className="hidden"
         />
         <div className="flex flex-col items-center justify-center text-center space-y-2">
           <UploadIcon className="h-8 w-8 text-muted-foreground" />
           <div>
             <p className="text-sm font-medium">
-              {uploading ? `Uploading ${uploading}...` : "Click or drag files here"}
+              {uploading.size > 0
+                ? `Uploading ${uploading.size} file${uploading.size !== 1 ? "s" : ""}...`
+                : "Click or drag files here"}
             </p>
             <p className="text-xs text-muted-foreground mt-1">
               Images (JPG, PNG, GIF, WEBP) or PDF up to 25MB
@@ -260,6 +274,31 @@ export function FileUpload({
       {error && (
         <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded p-2">
           {error}
+        </div>
+      )}
+
+      {/* Show uploading files with loading indicators */}
+      {uploading.size > 0 && (
+        <div className="space-y-2">
+          <p className="text-sm font-medium">Uploading...</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {Array.from(uploading).map((filename) => (
+              <Card key={filename} className="p-3 relative">
+                <div className="relative aspect-video mb-2 rounded overflow-hidden bg-muted flex items-center justify-center">
+                  <div className="flex flex-col items-center justify-center space-y-2">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    <span className="text-xs text-muted-foreground">Uploading...</span>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-medium truncate" title={filename}>
+                    {filename}
+                  </p>
+                  <Skeleton className="h-3 w-16" />
+                </div>
+              </Card>
+            ))}
+          </div>
         </div>
       )}
 

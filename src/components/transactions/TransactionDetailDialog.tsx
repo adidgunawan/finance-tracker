@@ -23,6 +23,8 @@ import { format } from "date-fns";
 import type { Database } from "@/lib/supabase/types";
 import { getTransactionAttachments } from "@/actions/transactions";
 import { FileTextIcon, ExternalLinkIcon } from "@radix-ui/react-icons";
+import { X } from "lucide-react";
+import { getDriveThumbnailUrl, getDriveFullImageUrl } from "@/lib/utils/google-drive";
 
 type Transaction = Database["public"]["Tables"]["transactions"]["Row"] & {
   transaction_lines?: Array<{
@@ -56,6 +58,7 @@ type Attachment = {
   filename: string;
   mime_type: string;
   file_size: number;
+  drive_file_id: string;
   drive_web_view_link: string;
   drive_download_link: string;
 };
@@ -74,14 +77,18 @@ export function TransactionDetailDialog({
   const { format: formatCurrency } = useCurrency();
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [loadingAttachments, setLoadingAttachments] = useState(false);
+  const [viewingImage, setViewingImage] = useState<Attachment | null>(null);
 
   useEffect(() => {
     if (open && transaction?.id) {
+      // Always reload attachments when dialog opens to ensure we have the latest data
+      // This handles cases where attachments were updated via EditTransactionDialog
       loadAttachments();
     } else {
       setAttachments([]);
     }
-  }, [open, transaction?.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, transaction?.id]); // Note: loadAttachments is stable, so we don't need it in deps
 
   const loadAttachments = async () => {
     if (!transaction?.id) return;
@@ -89,7 +96,21 @@ export function TransactionDetailDialog({
     setLoadingAttachments(true);
     try {
       const data = await getTransactionAttachments(transaction.id);
-      setAttachments(data as Attachment[]);
+      // Log attachment data for debugging
+      console.log("Loaded attachments:", data);
+      // Filter and map to ensure we have the correct structure
+      const attachments = (data || []).filter((att: any) => 
+        att && att.id && att.filename && att.drive_file_id
+      ).map((att: any) => ({
+        id: att.id,
+        filename: att.filename,
+        mime_type: att.mime_type,
+        file_size: att.file_size,
+        drive_file_id: att.drive_file_id,
+        drive_web_view_link: att.drive_web_view_link,
+        drive_download_link: att.drive_download_link,
+      }));
+      setAttachments(attachments);
     } catch (error) {
       console.error("Failed to load attachments:", error);
     } finally {
@@ -243,12 +264,26 @@ export function TransactionDetailDialog({
                     className="border rounded-lg p-3 space-y-2 hover:bg-muted/50 transition-colors"
                   >
                     {isImage(attachment.mime_type) ? (
-                      <div className="relative aspect-video rounded overflow-hidden bg-muted">
-                        <img
-                          src={attachment.drive_web_view_link}
-                          alt={attachment.filename}
-                          className="w-full h-full object-cover"
-                        />
+                      <div 
+                        className="relative aspect-video rounded overflow-hidden bg-muted cursor-pointer"
+                        onClick={() => setViewingImage(attachment)}
+                      >
+                        {attachment.drive_file_id ? (
+                          <img
+                            src={getDriveThumbnailUrl(attachment.drive_file_id)}
+                            alt={attachment.filename}
+                            className="w-full h-full object-cover hover:opacity-90 transition-opacity"
+                            onError={(e) => {
+                              console.error("Failed to load image preview for file:", attachment.drive_file_id, attachment.filename);
+                              // Hide the broken image and show error state
+                              e.currentTarget.style.display = "none";
+                            }}
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <FileTextIcon className="h-8 w-8 text-muted-foreground" />
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="aspect-video rounded bg-muted flex items-center justify-center">
@@ -267,7 +302,13 @@ export function TransactionDetailDialog({
                           variant="outline"
                           size="sm"
                           className="text-xs h-7"
-                          onClick={() => window.open(attachment.drive_web_view_link, "_blank")}
+                          onClick={() => {
+                            if (isImage(attachment.mime_type)) {
+                              setViewingImage(attachment);
+                            } else {
+                              window.open(attachment.drive_web_view_link, "_blank");
+                            }
+                          }}
                         >
                           <ExternalLinkIcon className="h-3 w-3 mr-1" />
                           View
@@ -289,6 +330,66 @@ export function TransactionDetailDialog({
           )}
         </div>
       </DialogContent>
+
+      {/* Image View Dialog */}
+      {viewingImage && (
+        <Dialog open={!!viewingImage} onOpenChange={(open) => !open && setViewingImage(null)}>
+          <DialogContent className="!max-w-[90vw] !max-h-[90vh] w-[90vw] h-[90vh] p-0 m-0 rounded-lg border bg-background shadow-lg [&>button]:hidden">
+            <DialogTitle className="sr-only">{viewingImage.filename}</DialogTitle>
+            {/* Top Bar - Google Drive style */}
+            <div className="flex items-center justify-between px-4 py-3 border-b bg-background">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setViewingImage(null)}
+                  className="p-1 hover:bg-muted rounded-full transition-colors"
+                  aria-label="Close"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+                <span className="text-sm font-medium truncate">{viewingImage.filename}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => window.open(viewingImage.drive_web_view_link, "_blank")}
+                  className="h-8"
+                >
+                  <ExternalLinkIcon className="h-4 w-4 mr-2" />
+                  Open in Drive
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => window.open(viewingImage.drive_download_link, "_blank")}
+                  className="h-8"
+                >
+                  Download
+                </Button>
+              </div>
+            </div>
+            
+            {/* Image Container */}
+            <div className="flex-1 flex items-center justify-center bg-muted/30 overflow-hidden">
+              {viewingImage.drive_file_id ? (
+                <img
+                  src={getDriveFullImageUrl(viewingImage.drive_file_id)}
+                  alt={viewingImage.filename}
+                  className="max-w-full max-h-full object-contain"
+                  onError={(e) => {
+                    console.error("Failed to load image:", viewingImage.drive_file_id);
+                    e.currentTarget.style.display = "none";
+                  }}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-full">
+                  <FileTextIcon className="h-16 w-16 text-muted-foreground" />
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </Dialog>
   );
 }

@@ -94,12 +94,13 @@ async function getOrCreateFolder(
 
 /**
  * Create user-specific folder structure in their Google Drive
- * Returns the transaction folder ID for the user
+ * Returns the user folder ID (Finance Tracker/{userId})
+ * Simplified structure for better performance
  */
 export async function createUserFolder(userId: string): Promise<string> {
   const drive = await getDriveClientForUser(userId);
 
-  // Create folder structure: Finance Tracker/Users/{userId}/Transactions
+  // Create simplified folder structure: Finance Tracker/{userId}
   // Start from root (user's Drive root)
   let currentFolderId: string | null = null;
 
@@ -110,38 +111,24 @@ export async function createUserFolder(userId: string): Promise<string> {
     "Finance Tracker"
   );
 
-  // Create "Users" folder
-  const usersFolderId = await getOrCreateFolder(
-    drive,
-    financeTrackerFolderId,
-    "Users"
-  );
+  // Create user-specific folder directly under Finance Tracker
+  const userFolderId = await getOrCreateFolder(drive, financeTrackerFolderId, userId);
 
-  // Create user-specific folder
-  const userFolderId = await getOrCreateFolder(drive, usersFolderId, userId);
-
-  // Create "Transactions" folder
-  const transactionsFolderId = await getOrCreateFolder(
-    drive,
-    userFolderId,
-    "Transactions"
-  );
-
-  // Verify the final folder is accessible
+  // Verify the folder is accessible
   try {
     const finalFolder = await drive.files.get({
-      fileId: transactionsFolderId,
+      fileId: userFolderId,
       fields: "id, name, parents",
     });
-    console.log(`Final transactions folder created: ${finalFolder.data.name} (${finalFolder.data.id})`);
+    console.log(`User folder created: ${finalFolder.data.name} (${finalFolder.data.id})`);
     if (finalFolder.data.parents && finalFolder.data.parents.length > 0) {
       console.log(`Folder parent: ${finalFolder.data.parents[0]}`);
     }
   } catch (verifyError: any) {
-    console.warn(`Warning: Cannot verify final folder:`, verifyError.message);
+    console.warn(`Warning: Cannot verify user folder:`, verifyError.message);
   }
 
-  return transactionsFolderId;
+  return userFolderId;
 }
 
 /**
@@ -164,15 +151,8 @@ export async function uploadFile(
 
   const drive = await getDriveClientForUser(userId);
 
-  // Get or create user's transaction folder
-  const transactionsFolderId = await createUserFolder(userId);
-
-  // Create transaction-specific folder
-  const transactionFolderId = await getOrCreateFolder(
-    drive,
-    transactionsFolderId,
-    transactionId
-  );
+  // Get or create user's folder (Finance Tracker/{userId})
+  const userFolderId = await createUserFolder(userId);
 
   // Convert File to Buffer if needed
   let fileBuffer: Buffer;
@@ -183,13 +163,18 @@ export async function uploadFile(
     fileBuffer = file;
   }
 
-  // Sanitize filename
-  const sanitizedFilename = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
+  // Sanitize original filename
+  const sanitizedOriginalFilename = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
+  
+  // Create unique filename: {timestamp}_{transactionId}_{originalFilename}
+  // This ensures uniqueness while keeping the original filename readable
+  const timestamp = Date.now();
+  const uniqueFilename = `${timestamp}_${transactionId}_${sanitizedOriginalFilename}`;
 
-  // Upload file
+  // Upload file directly to user folder (no per-transaction subfolders)
   const fileMetadata = {
-    name: sanitizedFilename,
-    parents: [transactionFolderId],
+    name: uniqueFilename,
+    parents: [userFolderId],
   };
 
   const media = {
@@ -199,7 +184,7 @@ export async function uploadFile(
 
   let uploadedFile;
   try {
-    console.log(`Uploading file "${sanitizedFilename}" to folder ${transactionFolderId}`);
+    console.log(`Uploading file "${uniqueFilename}" to folder ${userFolderId}`);
     uploadedFile = await drive.files.create({
       requestBody: fileMetadata,
       media,
