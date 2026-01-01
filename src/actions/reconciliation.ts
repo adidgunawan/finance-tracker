@@ -6,7 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import type { Database } from "@/lib/supabase/types";
 import { parseBCACSVFile, type ParsedCSVData } from "@/lib/utils/csv-parser";
 import { autoMatchAll, type MatchResult } from "@/lib/utils/transaction-matcher";
-import { generateExpenseLines, generateIncomeLines } from "@/lib/accounting/double-entry";
+import { generateExpenseLines, generateIncomeLines, generateTransferLines } from "@/lib/accounting/double-entry";
 import { createTransaction } from "./transactions";
 
 async function getSession() {
@@ -169,7 +169,7 @@ export async function getReconciliationSession(
 
   return {
     ...reconciliationSession,
-    parsed_data: reconciliationSession.parsed_data as ParsedCSVData,
+    parsed_data: reconciliationSession.parsed_data as unknown as ParsedCSVData,
     matches: (matches || []) as ReconciliationMatch[],
   };
 }
@@ -194,7 +194,7 @@ export async function getReconciliationSessions(): Promise<ReconciliationSession
 
   return (data || []).map((session) => ({
     ...session,
-    parsed_data: session.parsed_data as ParsedCSVData,
+    parsed_data: session.parsed_data as unknown as ParsedCSVData,
   })) as ReconciliationSession[];
 }
 

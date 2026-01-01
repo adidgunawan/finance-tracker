@@ -487,6 +487,96 @@ export type Database = {
           },
         ]
       }
+      reconciliation_sessions: {
+        Row: {
+          id: string
+          user_id: string
+          account_id: string
+          filename: string
+          parsed_data: Json
+          status: "in_progress" | "completed"
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          account_id: string
+          filename: string
+          parsed_data: Json
+          status?: "in_progress" | "completed"
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          account_id?: string
+          filename?: string
+          parsed_data?: Json
+          status?: "in_progress" | "completed"
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reconciliation_sessions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reconciliation_sessions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reconciliation_matches: {
+        Row: {
+          id: string
+          session_id: string
+          csv_row_index: number
+          transaction_id: string | null
+          match_type: "auto" | "manual" | "none"
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          session_id: string
+          csv_row_index: number
+          transaction_id?: string | null
+          match_type?: "auto" | "manual" | "none"
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          session_id?: string
+          csv_row_index?: number
+          transaction_id?: string | null
+          match_type?: "auto" | "manual" | "none"
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reconciliation_matches_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "reconciliation_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reconciliation_matches_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user: {
         Row: {
           email: string

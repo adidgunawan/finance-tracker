@@ -10,6 +10,7 @@ import {
   getReconciliationSessions,
   getReconciliationSession,
   type ReconciliationSession,
+  type ReconciliationMatch,
 } from "@/actions/reconciliation";
 import { ReconciliationView } from "@/components/reconcile/ReconciliationView";
 import { ReconciliationSessionList } from "@/components/reconcile/ReconciliationSessionList";
@@ -28,7 +29,7 @@ export default function ReconcilePage() {
   const [selectedAccountId, setSelectedAccountId] = useState<string>("");
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [sessions, setSessions] = useState<ReconciliationSession[]>([]);
-  const [currentSession, setCurrentSession] = useState<ReconciliationSession | null>(null);
+  const [currentSession, setCurrentSession] = useState<(ReconciliationSession & { matches: ReconciliationMatch[] }) | null>(null);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
 
@@ -81,7 +82,7 @@ export default function ReconcilePage() {
       
       // Load full session with matches
       const fullSession = await getReconciliationSession(session.id);
-      setCurrentSession(fullSession as any);
+      setCurrentSession(fullSession);
       setCsvFile(null);
       
       // Reset file input
@@ -101,7 +102,7 @@ export default function ReconcilePage() {
     try {
       setLoading(true);
       const session = await getReconciliationSession(sessionId);
-      setCurrentSession(session as any);
+      setCurrentSession(session);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to load session");
     } finally {
@@ -114,6 +115,14 @@ export default function ReconcilePage() {
       await loadSessions();
       const updated = await getReconciliationSession(currentSession.id);
       setCurrentSession(updated as any);
+    }
+  };
+
+  const handleSessionDelete = async (sessionId: string) => {
+    const sessionToDelete = currentSession;
+    await loadSessions();
+    if (sessionToDelete && sessionToDelete.id === sessionId) {
+      setCurrentSession(null);
     }
   };
 
@@ -206,12 +215,7 @@ export default function ReconcilePage() {
               sessions={sessions}
               loading={loading}
               onSessionSelect={handleSessionSelect}
-              onSessionDelete={async (sessionId) => {
-                await loadSessions();
-                if (currentSession?.id === sessionId) {
-                  setCurrentSession(null);
-                }
-              }}
+              onSessionDelete={handleSessionDelete}
             />
           </div>
         ) : (
