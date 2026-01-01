@@ -100,10 +100,11 @@ export type Database = {
           created_at: string
           id: string
           is_active: boolean
+          is_wallet: boolean
           level: number
           name: string
           parent_id: string | null
-          type: "asset" | "liability" | "income" | "expense"
+          type: "asset" | "liability" | "income" | "expense" | "equity"
           updated_at: string
           user_id: string
           currency: string | null
@@ -112,10 +113,11 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean
+          is_wallet?: boolean
           level: number
           name: string
           parent_id?: string | null
-          type: "asset" | "liability" | "income" | "expense"
+          type: "asset" | "liability" | "income" | "expense" | "equity"
           updated_at?: string
           user_id: string
           currency?: string | null
@@ -124,10 +126,11 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean
+          is_wallet?: boolean
           level?: number
           name?: string
           parent_id?: string | null
-          type?: "asset" | "liability" | "income" | "expense"
+          type?: "asset" | "liability" | "income" | "expense" | "equity"
           updated_at?: string
           user_id?: string
           currency?: string | null

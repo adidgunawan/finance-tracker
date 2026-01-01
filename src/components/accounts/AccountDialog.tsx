@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -21,11 +22,10 @@ import {
 } from "@/components/ui/select";
 import { getSettings } from "@/actions/settings";
 import type { Database } from "@/lib/supabase/types";
+import { ALL_CURRENCIES, getCurrencyDisplayName } from "@/lib/currencies";
 
 type Account = Database["public"]["Tables"]["chart_of_accounts"]["Row"];
 type AccountType = Account["type"];
-
-const AVAILABLE_CURRENCIES = ["USD", "EUR", "GBP", "IDR", "JPY", "SGD"];
 
 interface AccountDialogProps {
   open: boolean;
@@ -38,6 +38,7 @@ interface AccountDialogProps {
     parent_id: string | null;
     level: number;
     currency: string | null;
+    is_wallet?: boolean;
   }) => Promise<void>;
 }
 
@@ -52,6 +53,7 @@ export function AccountDialog({
   const [type, setType] = useState<AccountType>("asset");
   const [parentId, setParentId] = useState<string | null>(null);
   const [currency, setCurrency] = useState<string>("IDR");
+  const [isWallet, setIsWallet] = useState<boolean>(false);
   const [loading, setLoading] = useState(false);
   const [loadingCurrency, setLoadingCurrency] = useState(false);
 
@@ -61,10 +63,13 @@ export function AccountDialog({
       setType(account.type);
       setParentId(account.parent_id);
       setCurrency(account.currency || "IDR");
+      setIsWallet(account.is_wallet || false);
     } else {
       setName("");
       setType("asset");
       setParentId(null);
+      setCurrency("IDR");
+      setIsWallet(false);
       // Load default currency for new accounts
       loadDefaultCurrency();
     }
@@ -133,6 +138,7 @@ export function AccountDialog({
         parent_id: parentId,
         level,
         currency: currency || null,
+        is_wallet: type === "asset" ? isWallet : undefined,
       });
       onOpenChange(false);
       toast.success(account ? "Account updated successfully" : "Account created successfully");
@@ -174,6 +180,9 @@ export function AccountDialog({
               onValueChange={(value) => {
                 setType(value as AccountType);
                 setParentId(null); // Reset parent when type changes
+                if (value !== "asset") {
+                  setIsWallet(false); // Reset wallet flag if not asset
+                }
               }}
               disabled={!!account} // Can't change type when editing
             >
@@ -185,9 +194,31 @@ export function AccountDialog({
                 <SelectItem value="liability">Liability</SelectItem>
                 <SelectItem value="income">Income</SelectItem>
                 <SelectItem value="expense">Expense</SelectItem>
+                <SelectItem value="equity">Equity</SelectItem>
               </SelectContent>
             </Select>
           </div>
+
+          {type === "asset" && (
+            <div className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="is_wallet"
+                  checked={isWallet}
+                  onCheckedChange={(checked) => setIsWallet(checked === true)}
+                />
+                <Label
+                  htmlFor="is_wallet"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Mark as Wallet
+                </Label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Wallets are asset accounts that can have opening balances set
+              </p>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="parent">
@@ -226,10 +257,10 @@ export function AccountDialog({
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
-                {AVAILABLE_CURRENCIES.map((curr) => (
-                  <SelectItem key={curr} value={curr}>
-                    {curr}
+              <SelectContent className="max-h-[300px]">
+                {ALL_CURRENCIES.map((currency) => (
+                  <SelectItem key={currency.code} value={currency.code}>
+                    {getCurrencyDisplayName(currency.code)}
                   </SelectItem>
                 ))}
               </SelectContent>

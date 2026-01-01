@@ -34,10 +34,36 @@ import {
 } from "@/components/ui/sidebar";
 import { GearIcon, ExitIcon, ChevronDownIcon } from "@radix-ui/react-icons";
 
+// Simple wallet icon component
+const WalletIcon = ({ className }: { className?: string }) => (
+  <svg
+    className={className}
+    width="15"
+    height="15"
+    viewBox="0 0 15 15"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      d="M2 3C2 2.44772 2.44772 2 3 2H12C12.5523 2 13 2.44772 13 3V12C13 12.5523 12.5523 13 12 13H3C2.44772 13 2 12.5523 2 12V3ZM3 3V12H12V3H3Z"
+      fill="currentColor"
+      fillRule="evenodd"
+      clipRule="evenodd"
+    />
+    <path
+      d="M8 5.5C8 5.22386 8.22386 5 8.5 5H11.5C11.7761 5 12 5.22386 12 5.5C12 5.77614 11.7761 6 11.5 6H8.5C8.22386 6 8 5.77614 8 5.5Z"
+      fill="currentColor"
+      fillRule="evenodd"
+      clipRule="evenodd"
+    />
+  </svg>
+);
+
 const navigation = [
   { name: "Dashboard", href: "/", icon: HomeIcon },
   { name: "Transactions", href: "/transactions", icon: FileTextIcon },
   { name: "Accounts", href: "/accounts", icon: LayersIcon },
+  { name: "Wallets", href: "/wallets", icon: WalletIcon },
   { name: "Reconcile", href: "/reconcile", icon: UpdateIcon },
   { name: "Reports", href: "/reports", icon: BarChartIcon },
   { name: "Budgets", href: "/budgets", icon: TargetIcon },

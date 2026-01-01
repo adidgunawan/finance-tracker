@@ -1,7 +1,18 @@
 // Currency formatting utility
 // Maps currency codes to their symbols and formatting
 
-const CURRENCY_SYMBOLS: Record<string, string> = {
+import { ALL_CURRENCIES } from "./currencies";
+
+// Build currency symbols map from comprehensive currency list
+const CURRENCY_SYMBOLS: Record<string, string> = {};
+ALL_CURRENCIES.forEach((currency) => {
+  if (currency.symbol) {
+    CURRENCY_SYMBOLS[currency.code] = currency.symbol;
+  }
+});
+
+// Keep legacy symbols for backward compatibility
+const LEGACY_SYMBOLS: Record<string, string> = {
   USD: "$",
   EUR: "€",
   GBP: "£",
@@ -9,6 +20,9 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
   JPY: "¥",
   SGD: "S$",
 };
+
+// Merge legacy symbols (they may have different values)
+Object.assign(CURRENCY_SYMBOLS, LEGACY_SYMBOLS);
 
 const CURRENCY_POSITIONS: Record<string, "before" | "after"> = {
   USD: "before",

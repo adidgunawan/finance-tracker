@@ -67,11 +67,12 @@ export default function AccountsPage() {
     parent_id: string | null;
     level: number;
     currency: string | null;
+    is_wallet?: boolean;
   }) => {
     if (editingAccount) {
-      await updateAccount(editingAccount.id, data);
+      await updateAccount(editingAccount.id, { ...data, is_wallet: data.is_wallet || false });
     } else {
-      await createAccount(data);
+      await createAccount({ ...data, is_wallet: data.is_wallet || false });
     }
   };
 

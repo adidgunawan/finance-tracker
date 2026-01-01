@@ -17,19 +17,53 @@ if (!process.env.DATABASE_URL) {
 
 // Create database pool with error handling
 // Export it so AuthGuard can reuse it instead of creating new connections
+// IMPORTANT: For Supabase, use Transaction mode pooler URL (port 6543 or pooler URL)
+// Session mode has strict connection limits that can cause MaxClientsInSessionMode errors
 export let dbPool: Pool;
 try {
+  const connectionString = process.env.DATABASE_URL;
+  
+  // Validate connection string
+  if (!connectionString) {
+    throw new Error("DATABASE_URL is not set");
+  }
+
+  // Check if using Supabase connection pooler (recommended for serverless)
+  // Transaction mode pooler uses port 6543 or pooler URL
+  // This prevents MaxClientsInSessionMode errors
+  const isPoolerUrl = connectionString.includes(':6543') || 
+                      connectionString.includes('pooler.supabase.com') ||
+                      connectionString.includes('/pooler');
+
   dbPool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    // Add connection pool settings for Supabase
-    max: 10,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 2000,
+    connectionString,
+    // Reduce pool size for Supabase - Transaction mode pooler can handle more concurrent requests
+    // but each serverless function should use fewer connections
+    max: isPoolerUrl ? 5 : 2, // Smaller pool for pooler, very small for direct connection
+    idleTimeoutMillis: 10000, // Shorter idle timeout to release connections faster
+    connectionTimeoutMillis: 5000, // Longer timeout to allow for connection establishment
+    // Close idle connections faster
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 0,
   });
   
-  // Test connection
+  // Handle pool errors gracefully
   dbPool.on('error', (err) => {
     console.error('Unexpected database pool error:', err);
+    // Don't throw - let the pool handle reconnection
+  });
+
+  dbPool.on('connect', () => {
+    // Log connection events in development
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Database pool connection established');
+    }
+  });
+
+  dbPool.on('remove', () => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Database pool connection removed');
+    }
   });
 } catch (error) {
   console.error('Failed to create database pool:', error);

@@ -8,6 +8,12 @@ const nextConfig: NextConfig = {
       bodySizeLimit: '2mb',
     },
   },
+  // Fix better-auth bundling issue
+  serverExternalPackages: [
+    'better-auth',
+    'pg',
+    '@supabase/supabase-js',
+  ],
   // Increase header size limit
   async headers() {
     return [

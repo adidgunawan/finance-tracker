@@ -15,15 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { GoogleDriveConnection } from "@/components/settings/GoogleDriveConnection";
-
-const SUPPORTED_CURRENCIES = [
-  { code: "USD", name: "US Dollar ($)" },
-  { code: "EUR", name: "Euro (€)" },
-  { code: "GBP", name: "British Pound (£)" },
-  { code: "IDR", name: "Indonesian Rupiah (Rp)" },
-  { code: "JPY", name: "Japanese Yen (¥)" },
-  { code: "SGD", name: "Singapore Dollar (S$)" },
-];
+import { ALL_CURRENCIES, getCurrencyDisplayName } from "@/lib/currencies";
 
 export default function SettingsPage() {
   const [currency, setCurrency] = useState("IDR");
@@ -110,10 +102,10 @@ export default function SettingsPage() {
                 <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select currency" />
                 </SelectTrigger>
-                <SelectContent>
-                    {SUPPORTED_CURRENCIES.map((c) => (
-                    <SelectItem key={c.code} value={c.code}>
-                        {c.name}
+                <SelectContent className="max-h-[300px]">
+                    {ALL_CURRENCIES.map((currency) => (
+                    <SelectItem key={currency.code} value={currency.code}>
+                        {getCurrencyDisplayName(currency.code)}
                     </SelectItem>
                     ))}
                 </SelectContent>
