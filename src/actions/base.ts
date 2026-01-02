@@ -1,19 +1,21 @@
 "use server";
 
+import { cache } from "react";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/client";
 
 // Helper to get current session on server
-export async function getSession() {
+// Cached to prevent multiple session fetches in the same request
+export const getSession = cache(async () => {
   return await auth.api.getSession({
     headers: await headers(),
   });
-}
+});
 
-// Example Server Action for Accounts
-// We will replace useAccounts hook logic with this
-export async function getAccounts() {
+// Server Action for Accounts with request deduplication
+// Multiple components calling this in the same request will only fetch once
+export const getAccounts = cache(async () => {
   const session = await getSession();
   if (!session) {
     throw new Error("Unauthorized");
@@ -29,7 +31,7 @@ export async function getAccounts() {
 
   if (error) throw new Error(error.message);
   return data;
-}
+});
 
 // We will need to create actions for all operations
 // This file serves as the base for data access

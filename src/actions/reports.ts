@@ -1,14 +1,15 @@
 "use server";
 
+import { cache } from "react";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-async function getSession() {
+const getSession = cache(async () => {
   return await auth.api.getSession({
     headers: await headers(),
   });
-}
+});
 
 export interface ReportFilters {
   startDate?: string;

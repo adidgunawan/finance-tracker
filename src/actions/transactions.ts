@@ -1,5 +1,6 @@
 "use server";
 
+import { cache } from "react";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -17,11 +18,11 @@ import { deleteFile } from "@/lib/google-drive";
 type TransactionInsert = Database["public"]["Tables"]["transactions"]["Insert"];
 type TransactionLineInsert = Database["public"]["Tables"]["transaction_lines"]["Insert"];
 
-async function getSession() {
+const getSession = cache(async () => {
   return await auth.api.getSession({
     headers: await headers(),
   });
-}
+});
 
 interface CreateTransactionData {
   transaction_date: string;
@@ -42,7 +43,8 @@ interface CreateTransactionData {
   tag_ids?: string[];
 }
 
-export async function getTransactions() {
+// Cached to deduplicate transaction fetches within the same request
+export const getTransactions = cache(async () => {
   const session = await getSession();
   if (!session) throw new Error("Unauthorized");
 
@@ -65,7 +67,7 @@ export async function getTransactions() {
 
   if (error) throw new Error(error.message);
   return data || [];
-}
+});
 
 export async function createTransaction(data: CreateTransactionData) {
   const session = await getSession();

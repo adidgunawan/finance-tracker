@@ -1,32 +1,36 @@
-"use client";
-
+import { Suspense } from "react";
 import { CashFlowSummary } from "@/components/dashboard/CashFlowSummary";
 import { MonthlyTrendChart } from "@/components/dashboard/MonthlyTrendChart";
 import { AssetDistributionChart } from "@/components/dashboard/AssetDistributionChart";
-import { useDashboardData } from "@/hooks/useDashboardData";
+import { getDashboardData } from "@/actions/dashboard";
 
-export default function DashboardPage() {
-  const { data, loading, error } = useDashboardData();
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background p-8">
-        <div className="max-w-[98%] mx-auto">
-          <p className="text-muted-foreground">Loading dashboard...</p>
+// Loading skeleton component
+function DashboardSkeleton() {
+  return (
+    <div className="min-h-screen bg-background p-8">
+      <div className="max-w-[98%] mx-auto space-y-6">
+        <div className="animate-pulse">
+          <div className="h-8 bg-muted rounded w-48 mb-2"></div>
+          <div className="h-4 bg-muted rounded w-64"></div>
+        </div>
+        <div className="grid grid-cols-3 gap-6">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-32 bg-muted rounded animate-pulse"></div>
+          ))}
+        </div>
+        <div className="grid grid-cols-2 gap-6">
+          <div className="h-80 bg-muted rounded animate-pulse"></div>
+          <div className="h-80 bg-muted rounded animate-pulse"></div>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-background p-8">
-        <div className="max-w-[98%] mx-auto">
-          <p className="text-destructive">Error: {error}</p>
-        </div>
-      </div>
-    );
-  }
+// Server Component - data fetched on server, cached, instant navigation
+export default async function DashboardPage() {
+  // Fetch data on server - cached with React cache()
+  const data = await getDashboardData();
 
   return (
     <div className="min-h-screen bg-background p-8">
@@ -51,4 +55,9 @@ export default function DashboardPage() {
       </div>
     </div>
   );
+}
+
+// Export loading component for layout
+export function DashboardLoading() {
+  return <DashboardSkeleton />;
 }

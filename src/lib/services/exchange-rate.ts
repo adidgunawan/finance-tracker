@@ -5,11 +5,12 @@
  * Features:
  * - Primary API: ExchangeRate-API (165 currencies including VND)
  * - Fallback API: Frankfurter (30 major currencies)
- * - 24-hour caching in database to stay within free tier limits
+ * - 3-tier caching: memory (1 hour) → database (24 hours) → API
  * - Graceful fallback to stale cached rates if both APIs fail
  */
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { exchangeRateCache, EXCHANGE_RATE_TTL } from "@/lib/cache/kv-store";
 
 // Primary API: ExchangeRate-API (free tier, 165 currencies)
 const PRIMARY_API_URL = "https://api.exchangerate-api.com/v4/latest";
@@ -167,11 +168,11 @@ async function cacheRate(
 /**
  * Get exchange rate between two currencies
  * 
- * Strategy:
- * 1. Check for cached rate
- * 2. If cached and fresh, return it
- * 3. If cached but stale, try API; fallback to stale cache if API fails
- * 4. If not cached, fetch from API and cache it
+ * Strategy (3-tier caching):
+ * 1. Check in-memory cache (instant, 1 hour TTL)
+ * 2. Check database cache (fast, 24 hour TTL)
+ * 3. Fetch from API (slow, cache result)
+ * 4. If API fails, use stale cache
  * 
  * @throws Error if currency pair is unsupported or API is down with no cached rate
  */
@@ -179,32 +180,51 @@ export async function getExchangeRate(
   fromCurrency: string,
   toCurrency: string
 ): Promise<ExchangeRate> {
+  const from = fromCurrency.toUpperCase();
+  const to = toCurrency.toUpperCase();
+
   // Same currency = 1:1 rate
-  if (fromCurrency.toUpperCase() === toCurrency.toUpperCase()) {
+  if (from === to) {
     return {
-      baseCurrency: fromCurrency.toUpperCase(),
-      targetCurrency: toCurrency.toUpperCase(),
+      baseCurrency: from,
+      targetCurrency: to,
       rate: 1.0,
       fetchedAt: new Date(),
     };
   }
 
-  // Check cache first
+  // TIER 1: Check in-memory cache (instant, no DB/API call)
+  const cacheKey = `${from}_${to}`;
+  const memCached = exchangeRateCache.get(cacheKey);
+  if (memCached !== null) {
+    return {
+      baseCurrency: from,
+      targetCurrency: to,
+      rate: memCached,
+      fetchedAt: new Date(), // Memory cache doesn't store timestamp
+    };
+  }
+
+  // TIER 2: Check database cache
   const cachedRate = await getCachedRate(fromCurrency, toCurrency);
 
   if (cachedRate && !isRateStale(cachedRate.fetchedAt)) {
-    // Fresh cached rate - use it
+    // Fresh DB cached rate - store in memory and use it
+    exchangeRateCache.set(cacheKey, cachedRate.rate, EXCHANGE_RATE_TTL);
     return cachedRate;
   }
 
-  // Try to fetch fresh rate from API
+  // TIER 3: Try to fetch fresh rate from API
   try {
     const rate = await fetchRateFromAPI(fromCurrency, toCurrency);
     await cacheRate(fromCurrency, toCurrency, rate);
+    
+    // Store in memory cache
+    exchangeRateCache.set(cacheKey, rate, EXCHANGE_RATE_TTL);
 
     return {
-      baseCurrency: fromCurrency.toUpperCase(),
-      targetCurrency: toCurrency.toUpperCase(),
+      baseCurrency: from,
+      targetCurrency: to,
       rate,
       fetchedAt: new Date(),
     };
@@ -215,6 +235,8 @@ export async function getExchangeRate(
         `Using stale cached rate for ${fromCurrency}/${toCurrency}:`,
         error instanceof Error ? error.message : "Unknown error"
       );
+      // Still cache in memory even if stale
+      exchangeRateCache.set(cacheKey, cachedRate.rate, EXCHANGE_RATE_TTL);
       return cachedRate;
     }
 
