@@ -28,8 +28,8 @@ export function useCurrency() {
   return {
     currency,
     loading,
-    format: (amount: number, options?: { showSymbol?: boolean; decimals?: number }) =>
-      formatCurrency(amount, currency, options),
+    format: (amount: number, options?: { showSymbol?: boolean; decimals?: number; currency?: string }) =>
+      formatCurrency(amount, options?.currency || currency, options),
     symbol: getCurrencySymbol(currency),
   };
 }

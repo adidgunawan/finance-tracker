@@ -98,7 +98,7 @@ export function TransferForm({ onSuccess }: TransferFormProps) {
         toAccountId,
         feeAmountNum,
         feeAccountId || undefined,
-        undefined, // currency
+        assetAccounts.find((a) => a.id === fromAccountId)?.currency || undefined, // currency
         undefined, // exchangeRate
         attachmentIds.length > 0 ? attachmentIds : undefined
       );

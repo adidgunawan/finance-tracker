@@ -193,7 +193,7 @@ function AccountNode({ account }: AccountNodeProps) {
                   account.original_balance !== undefined 
                     ? account.original_balance 
                     : account.balance || 0
-                ))}
+                ), { currency: account.currency || undefined })}
               </div>
             </div>
           </div>

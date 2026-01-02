@@ -49,7 +49,16 @@ export async function getTransactions() {
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("transactions")
-    .select("*")
+    .select(`
+      *,
+      transaction_lines (
+        account_id,
+        account:chart_of_accounts (
+          currency,
+          type
+        )
+      )
+    `)
     .eq("user_id", session.user.id)
     .order("transaction_date", { ascending: false })
     .order("created_at", { ascending: false });

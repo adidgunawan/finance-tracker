@@ -138,8 +138,8 @@ export function IncomeForm({ onSuccess }: IncomeFormProps) {
         })),
         assetAccountId,
         payee || undefined,
-        transactionId || undefined,
-        undefined, // currency
+        undefined, // transactionId
+        assetAccounts.find((a) => a.id === assetAccountId)?.currency || undefined, // currency
         undefined, // exchangeRate
         attachmentIds.length > 0 ? attachmentIds : undefined
       );
@@ -303,7 +303,7 @@ export function IncomeForm({ onSuccess }: IncomeFormProps) {
                   Subtotal:
                 </TableCell>
                 <TableCell colSpan={2} className="font-bold text-lg">
-                  {formatCurrency(calculateSubtotal())}
+                  {formatCurrency(calculateSubtotal(), { currency: assetAccounts.find((a) => a.id === assetAccountId)?.currency || undefined })}
                 </TableCell>
               </TableRow>
             </TableFooter>

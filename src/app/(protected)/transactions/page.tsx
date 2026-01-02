@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { Database } from "@/lib/supabase/types";
 import {
   Table,
   TableBody,
@@ -22,6 +23,15 @@ import { format } from "date-fns";
 import { TrashIcon, PlusIcon, ArrowTopRightIcon, ArrowBottomLeftIcon, UpdateIcon } from "@radix-ui/react-icons";
 import { TransactionDetailDialog } from "@/components/transactions/TransactionDetailDialog";
 import { EditTransactionDialog } from "@/components/transactions/EditTransactionDialog";
+
+type Transaction = Database["public"]["Tables"]["transactions"]["Row"] & {
+  transaction_lines?: {
+    account?: {
+      currency: string | null;
+      type: string;
+    } | null;
+  }[];
+};
 
 export default function TransactionsPage() {
   const { transactions, loading, error, deleteTransaction, getTransaction, refreshTransactions } = useTransactions();
@@ -194,7 +204,13 @@ export default function TransactionsPage() {
                           {transaction.description}
                         </TableCell>
                         <TableCell className={`font-semibold ${transaction.type === 'income' ? 'text-primary' : 'text-foreground'}`}>
-                          {transaction.type === 'expense' ? '-' : ''}{formatCurrency(transaction.amount)}
+                          {transaction.type === 'expense' ? '-' : ''}{formatCurrency(transaction.amount, { 
+                            currency: (transaction.currency && transaction.currency !== "USD") 
+                              ? transaction.currency 
+                              : (transaction.transaction_lines?.find((l: any) => 
+                                  l.account?.type === 'asset' || l.account?.type === 'liability' || l.account?.type === 'credit_card'
+                                )?.account?.currency || transaction.currency || "USD")
+                          })}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {transaction.payee_payer || "-"}

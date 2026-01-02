@@ -168,7 +168,13 @@ export function TransactionDetailDialog({
               <div>
                 <div className="text-sm text-muted-foreground">Amount</div>
                 <div className="font-bold text-lg">
-                  {formatCurrency(transaction.amount)}
+                  {formatCurrency(transaction.amount, { 
+                    currency: (transaction.currency && transaction.currency !== "USD")
+                      ? transaction.currency
+                      : (transaction.transaction_lines?.find((l: any) => 
+                          l.account?.type === 'asset' || l.account?.type === 'liability' || l.account?.type === 'credit_card'
+                        )?.account?.currency || transaction.currency || "USD")
+                  })}
                 </div>
               </div>
               {transaction.payee_payer && (
@@ -209,7 +215,7 @@ export function TransactionDetailDialog({
                           {item.expense_account?.name || item.income_account?.name || "N/A"}
                         </TableCell>
                         <TableCell className="text-right">
-                          {formatCurrency(item.amount)}
+                          {formatCurrency(item.amount, { currency: transaction.currency || "USD" })}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -238,12 +244,12 @@ export function TransactionDetailDialog({
                       </TableCell>
                       <TableCell className="text-right">
                         {line.debit_amount
-                          ? formatCurrency(line.debit_amount)
+                          ? formatCurrency(line.debit_amount, { currency: transaction.currency || "USD" })
                           : "-"}
                       </TableCell>
                       <TableCell className="text-right">
                         {line.credit_amount
-                          ? formatCurrency(line.credit_amount)
+                          ? formatCurrency(line.credit_amount, { currency: transaction.currency || "USD" })
                           : "-"}
                       </TableCell>
                     </TableRow>

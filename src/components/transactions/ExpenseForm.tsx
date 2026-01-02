@@ -140,7 +140,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
         assetAccountId,
         payer || undefined,
         transactionId || undefined,
-        undefined, // currency
+        assetAccounts.find((a) => a.id === assetAccountId)?.currency || undefined, // currency
         undefined, // exchangeRate
         attachmentIds.length > 0 ? attachmentIds : undefined
       );
@@ -302,7 +302,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
                   Subtotal:
                 </TableCell>
                 <TableCell colSpan={2} className="font-bold text-lg">
-                  {formatCurrency(calculateSubtotal())}
+                  {formatCurrency(calculateSubtotal(), { currency: assetAccounts.find((a) => a.id === assetAccountId)?.currency || undefined })}
                 </TableCell>
               </TableRow>
             </TableFooter>

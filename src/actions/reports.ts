@@ -26,6 +26,7 @@ export interface TransactionReportItem {
   amount: number;
   payee_payer: string | null;
   account_name: string;
+  currency?: string | null;
 }
 
 export interface AccountHierarchyItem {
@@ -39,6 +40,7 @@ export interface AccountHierarchyItem {
   balance: number;
   original_balance?: number; // Balance before adding children
   children?: AccountHierarchyItem[];
+  currency?: string | null;
 }
 
 export interface TimeBasedReportItem {
@@ -65,6 +67,7 @@ export async function getTransactionsReport(filters: ReportFilters = {}) {
       type,
       description,
       amount,
+      currency,
       payee_payer,
       transaction_lines!inner(
         account_id,
@@ -98,6 +101,7 @@ export async function getTransactionsReport(filters: ReportFilters = {}) {
       type: t.type,
       description: t.description,
       amount: t.amount,
+      currency: t.currency,
       payee_payer: t.payee_payer,
       account_name: accountLine?.account?.name || "Unknown",
     };
@@ -220,6 +224,7 @@ export async function getAccountHierarchyReport(
       balance,
       original_balance: balance, // Store original balance before adding children
       children: [],
+      currency: account.currency,
     };
 
     accountMap.set(account.id, item);
