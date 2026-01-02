@@ -100,3 +100,25 @@ export function formatCurrency(
   }
 }
 
+/**
+ * Get the number of decimal places for a currency
+ * Most currencies use 2 decimals, but some (like JPY, KRW) use 0
+ */
+export function getCurrencyDecimals(currencyCode: string): number {
+  const zeroDecimalCurrencies = ["JPY", "KRW", "VND", "CLP", "PYG", "IDR"];
+  
+  if (zeroDecimalCurrencies.includes(currencyCode.toUpperCase())) {
+    return 0;
+  }
+  
+  return 2;
+}
+
+/**
+ * Round amount to the appropriate number of decimals for the currency
+ */
+export function roundToCurrency(amount: number, currencyCode: string): number {
+  const decimals = getCurrencyDecimals(currencyCode);
+  const multiplier = Math.pow(10, decimals);
+  return Math.round(amount * multiplier) / multiplier;
+}

@@ -41,6 +41,7 @@ export interface AccountHierarchyItem {
   original_balance?: number; // Balance before adding children
   children?: AccountHierarchyItem[];
   currency?: string | null;
+  converted_balance?: number; // Balance converted to base currency
 }
 
 export interface TimeBasedReportItem {
@@ -229,6 +230,41 @@ export async function getAccountHierarchyReport(
 
     accountMap.set(account.id, item);
   });
+
+  // Get user's base currency and convert balances
+  const { data: settings } = await supabase
+    .from("settings")
+    .select("default_currency")
+    .eq("user_id", session.user.id)
+    .single();
+
+  const baseCurrency = settings?.default_currency || "IDR";
+
+  // Import conversion function
+  const { convertCurrency } = await import("@/lib/services/exchange-rate");
+
+  // Convert balances for non-base currencies
+  for (const [accountId, item] of accountMap) {
+    if (item.currency && item.currency !== baseCurrency && item.balance !== 0) {
+      try {
+        const result = await convertCurrency(
+          Math.abs(item.balance),
+          item.currency,
+          baseCurrency
+        );
+        // Preserve sign
+        item.converted_balance = item.balance >= 0 
+          ? result.convertedAmount 
+          : -result.convertedAmount;
+      } catch (error) {
+        // Gracefully handle unsupported pairs - use original balance
+        item.converted_balance = item.balance;
+      }
+    } else {
+      // Same currency or no conversion needed
+      item.converted_balance = item.balance;
+    }
+  }
 
   // Build tree structure
   accountMap.forEach((item) => {

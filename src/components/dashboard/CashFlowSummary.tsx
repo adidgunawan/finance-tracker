@@ -3,6 +3,7 @@
 import { Card } from "@/components/ui/card";
 import { ArrowUpIcon, ArrowDownIcon, DashIcon } from "@radix-ui/react-icons";
 import { useCurrency } from "@/hooks/useCurrency";
+import { useCurrencyConversion } from "@/hooks/useCurrencyConversion";
 
 interface CashFlowSummaryProps {
   totalIncome: number;
@@ -16,9 +17,14 @@ export function CashFlowSummary({
   netCashFlow,
 }: CashFlowSummaryProps) {
   const { format: formatCurrency } = useCurrency();
+  const { baseCurrency } = useCurrencyConversion();
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div className="space-y-4">
+      <p className="text-xs text-muted-foreground text-center">
+        All amounts converted to {baseCurrency} (estimated)
+      </p>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
       <Card className="p-6 relative overflow-hidden group">
         <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
             <ArrowUpIcon className="w-24 h-24 text-primary" />
@@ -83,6 +89,7 @@ export function CashFlowSummary({
           </div>
         </div>
       </Card>
+      </div>
     </div>
   );
 }

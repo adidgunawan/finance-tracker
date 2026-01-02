@@ -2,6 +2,7 @@
 
 import { Card } from "@/components/ui/card";
 import { useCurrency } from "@/hooks/useCurrency";
+import { useCurrencyConversion } from "@/hooks/useCurrencyConversion";
 import { formatDateRange, getDateRangeISO } from "@/lib/utils/dateRange";
 import type { ReportFilters } from "@/actions/reports";
 
@@ -19,6 +20,7 @@ export function ReportSummary({
   filters,
 }: ReportSummaryProps) {
   const { format: formatCurrency } = useCurrency();
+  const { baseCurrency } = useCurrencyConversion();
   const net = totalIncome - totalExpense;
 
   const getDateRangeText = () => {
@@ -31,6 +33,10 @@ export function ReportSummary({
   };
 
   return (
+    <div className="space-y-2">
+      <p className="text-xs text-muted-foreground text-center">
+        All amounts converted to {baseCurrency} (estimated)
+      </p>
     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
       <Card className="p-4">
         <div className="text-sm text-muted-foreground">Total Income</div>
@@ -62,6 +68,7 @@ export function ReportSummary({
         <div className="text-sm text-muted-foreground">Date Range</div>
         <div className="text-sm font-medium mt-1">{getDateRangeText()}</div>
       </Card>
+    </div>
     </div>
   );
 }

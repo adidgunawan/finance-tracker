@@ -12,8 +12,10 @@ import {
 } from "@/components/ui/table";
 import { WalletBalance } from "./WalletBalance";
 import { WalletDialog } from "./WalletDialog";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { WalletWithBalance } from "@/actions/wallets";
+import { useCurrencyConversion } from "@/hooks/useCurrencyConversion";
+import { formatCurrency } from "@/lib/currency";
 
 interface WalletListProps {
   wallets: WalletWithBalance[];
@@ -24,6 +26,33 @@ interface WalletListProps {
 export function WalletList({ wallets, loading, onRefresh }: WalletListProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedWallet, setSelectedWallet] = useState<WalletWithBalance | null>(null);
+  const { baseCurrency, convertToBase, loading: conversionLoading } = useCurrencyConversion();
+  const [totalNetWorth, setTotalNetWorth] = useState<number>(0);
+
+  useEffect(() => {
+    // Calculate total net worth by converting all wallets to base currency
+    if (!conversionLoading && wallets.length > 0) {
+      Promise.all(
+        wallets.map(async (wallet) => {
+          try {
+            const result = await convertToBase(wallet.balance, wallet.currency || "USD");
+            return result.convertedAmount;
+          } catch (error) {
+            // If conversion fails (unsupported currency pair), use original balance as fallback
+            console.warn(`Skipping conversion for ${wallet.name} (${wallet.currency}):`, error);
+            return wallet.balance;
+          }
+        })
+      )
+        .then((convertedBalances) => {
+          const total = convertedBalances.reduce((sum, balance) => sum + balance, 0);
+          setTotalNetWorth(total);
+        })
+        .catch((error) => {
+          console.error("Failed to calculate total net worth:", error);
+        });
+    }
+  }, [wallets, baseCurrency, conversionLoading, convertToBase]);
 
   const handleSetOpeningBalance = (wallet: WalletWithBalance) => {
     setSelectedWallet(wallet);
@@ -60,13 +89,31 @@ export function WalletList({ wallets, loading, onRefresh }: WalletListProps) {
 
   return (
     <>
+      {/* Total Net Worth Summary */}
+      <Card className="p-6 bg-gradient-to-br from-primary/10 via-primary/5 to-background border-primary/20">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-muted-foreground">Total Net Worth</p>
+            <p className="text-3xl font-bold text-primary mt-1">
+              {formatCurrency(totalNetWorth, baseCurrency)}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Estimated in {baseCurrency} • {wallets.length} wallet{wallets.length !== 1 ? 's' : ''}
+            </p>
+          </div>
+          <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center">
+            <span className="text-3xl">💰</span>
+          </div>
+        </div>
+      </Card>
+
       <Card className="p-6">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Wallet Name</TableHead>
               <TableHead>Currency</TableHead>
-              <TableHead className="text-right">Balance</TableHead>
+              <TableHead className="text-right">Balance / Estimated Value</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>

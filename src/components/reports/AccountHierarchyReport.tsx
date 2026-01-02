@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/collapsible";
 import { ChevronRightIcon, ChevronDownIcon } from "@radix-ui/react-icons";
 import { useCurrency } from "@/hooks/useCurrency";
+import { useCurrencyConversion } from "@/hooks/useCurrencyConversion";
 import type { AccountHierarchyItem } from "@/actions/reports";
 
 interface AccountHierarchyReportProps {
@@ -85,14 +86,10 @@ interface AccountTypeGroupProps {
 function AccountTypeGroup({ type, label, accounts }: AccountTypeGroupProps) {
   const [isOpen, setIsOpen] = useState(true);
 
-  // Calculate total balance for this type - only accounts at this level, not children
+  // Calculate total balance using converted balances for accurate totals
   const totalBalance = useMemo(() => {
     return accounts.reduce((sum, account) => {
-      // Use original_balance if available, otherwise use balance (both should be the same now)
-      const accountBalance = account.original_balance !== undefined 
-        ? account.original_balance 
-        : account.balance || 0;
-      return sum + accountBalance;
+      return sum + (account.converted_balance ?? account.balance ?? 0);
     }, 0);
   }, [accounts]);
 
@@ -145,7 +142,10 @@ interface AccountNodeProps {
 function AccountNode({ account }: AccountNodeProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const { format: formatCurrency } = useCurrency();
+  const { baseCurrency } = useCurrencyConversion();
   const hasChildren = account.children && account.children.length > 0;
+
+  const showConversion = account.currency && account.currency !== baseCurrency && account.converted_balance !== undefined;
 
   return (
     <div>
@@ -195,6 +195,11 @@ function AccountNode({ account }: AccountNodeProps) {
                     : account.balance || 0
                 ), { currency: account.currency || undefined })}
               </div>
+              {showConversion && account.converted_balance !== undefined && (
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  ≈ {formatCurrency(Math.abs(account.converted_balance))}
+                </div>
+              )}
             </div>
           </div>
         </div>
