@@ -1,9 +1,4 @@
-import { Metadata } from "next";
-
-export const metadata: Metadata = {
-  title: "Offline - Finance Tracker",
-  description: "You are currently offline",
-};
+"use client";
 
 export default function OfflinePage() {
   return (
