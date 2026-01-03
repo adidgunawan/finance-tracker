@@ -205,11 +205,7 @@ export default function TransactionsPage() {
                         </TableCell>
                         <TableCell className={`font-semibold ${transaction.type === 'income' ? 'text-primary' : 'text-foreground'}`}>
                           {transaction.type === 'expense' ? '-' : ''}{formatCurrency(transaction.amount, { 
-                            currency: (transaction.currency && transaction.currency !== "USD") 
-                              ? transaction.currency 
-                              : (transaction.transaction_lines?.find((l: any) => 
-                                  l.account?.type === 'asset' || l.account?.type === 'liability' || l.account?.type === 'credit_card'
-                                )?.account?.currency || transaction.currency || "USD")
+                            currency: transaction.currency || "USD"
                           })}
                         </TableCell>
                         <TableCell className="text-muted-foreground">

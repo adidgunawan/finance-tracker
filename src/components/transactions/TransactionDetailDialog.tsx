@@ -169,11 +169,7 @@ export function TransactionDetailDialog({
                 <div className="text-sm text-muted-foreground">Amount</div>
                 <div className="font-bold text-lg">
                   {formatCurrency(transaction.amount, { 
-                    currency: (transaction.currency && transaction.currency !== "USD")
-                      ? transaction.currency
-                      : (transaction.transaction_lines?.find((l: any) => 
-                          l.account?.type === 'asset' || l.account?.type === 'liability' || l.account?.type === 'credit_card'
-                        )?.account?.currency || transaction.currency || "USD")
+                    currency: transaction.currency || "USD"
                   })}
                 </div>
               </div>
