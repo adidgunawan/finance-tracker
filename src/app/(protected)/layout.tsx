@@ -3,6 +3,7 @@ import { AppSidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AuthGuard } from "@/components/auth/AuthGuard";
+import { InstallPrompt } from "@/components/InstallPrompt";
 
 function LoadingFallback() {
   return (
@@ -29,6 +30,7 @@ export default function ProtectedLayout({
             </Suspense>
           </main>
         </SidebarInset>
+        <InstallPrompt />
       </SidebarProvider>
     </AuthGuard>
   );

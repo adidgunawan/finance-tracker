@@ -1,6 +1,4 @@
-import { Suspense } from "react";
-
-export default function DashboardLoading() {
+export default function Loading() {
   return (
     <div className="min-h-screen bg-background p-8">
       <div className="max-w-[98%] mx-auto space-y-6">
@@ -21,3 +19,4 @@ export default function DashboardLoading() {
     </div>
   );
 }
+

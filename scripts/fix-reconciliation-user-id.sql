@@ -39,3 +39,4 @@ CREATE INDEX IF NOT EXISTS idx_reconciliation_sessions_status ON reconciliation_
 CREATE INDEX IF NOT EXISTS idx_reconciliation_matches_session_id ON reconciliation_matches(session_id);
 CREATE INDEX IF NOT EXISTS idx_reconciliation_matches_transaction_id ON reconciliation_matches(transaction_id);
 
+

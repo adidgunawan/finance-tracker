@@ -83,3 +83,4 @@ function outputFormattedKey(serviceAccount) {
 const jsonPath = process.argv[2];
 formatPrivateKey(jsonPath);
 
+

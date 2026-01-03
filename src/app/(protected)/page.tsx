@@ -57,7 +57,3 @@ export default async function DashboardPage() {
   );
 }
 
-// Export loading component for layout
-export function DashboardLoading() {
-  return <DashboardSkeleton />;
-}

@@ -44,3 +44,4 @@ export function isEmailAllowed(email: string): boolean {
   return allowedEmails.has(email.trim().toLowerCase());
 }
 
+
