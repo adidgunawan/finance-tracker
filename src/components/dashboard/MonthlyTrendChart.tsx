@@ -25,8 +25,8 @@ export function MonthlyTrendChart({ data }: MonthlyTrendChartProps) {
   const { format: formatCurrency, symbol } = useCurrency();
 
   return (
-    <Card className="p-6">
-      <h3 className="text-lg font-bold text-foreground mb-6">
+    <Card className="p-4 md:p-6">
+      <h3 className="text-lg font-bold text-foreground mb-4 md:mb-6">
         Monthly Trends
       </h3>
       <ResponsiveContainer width="100%" height={300}>

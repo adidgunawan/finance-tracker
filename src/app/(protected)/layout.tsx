@@ -4,6 +4,7 @@ import { Header } from "@/components/layout/Header";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AuthGuard } from "@/components/auth/AuthGuard";
 import { InstallPrompt } from "@/components/InstallPrompt";
+import { MobileNav } from "@/components/layout/MobileNav";
 
 function LoadingFallback() {
   return (
@@ -21,15 +22,30 @@ export default function ProtectedLayout({
   return (
     <AuthGuard>
       <SidebarProvider>
-        <AppSidebar />
+        {/* Desktop Sidebar - hidden on mobile */}
+        <div className="hidden md:block">
+          <AppSidebar />
+        </div>
+        
         <SidebarInset>
-          <Header />
-          <main className="flex-1">
+          {/* Desktop Header - hidden on mobile */}
+          <div className="hidden md:block">
+            <Header />
+          </div>
+
+          {/* Mobile Header - simplified if needed, or just content */}
+          {/* For now we just let content flow, MobileNav provides navigation */}
+          
+          <main className="flex-1 pb-20 md:pb-0">
             <Suspense fallback={<LoadingFallback />}>
               {children}
             </Suspense>
           </main>
         </SidebarInset>
+        
+        {/* Mobile Navigation - fixed bottom */}
+        <MobileNav />
+        
         <InstallPrompt />
       </SidebarProvider>
     </AuthGuard>

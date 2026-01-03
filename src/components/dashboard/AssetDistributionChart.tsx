@@ -1,5 +1,7 @@
 "use client";
 
+import { useState, useEffect } from "react";
+
 import { Card } from "@/components/ui/card";
 import {
   PieChart,
@@ -29,10 +31,21 @@ const COLORS = [
 
 export function AssetDistributionChart({ data }: AssetDistributionChartProps) {
   const { format: formatCurrency } = useCurrency();
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   if (data.length === 0) {
     return (
-      <Card className="p-6 flex flex-col items-center justify-center min-h-[350px]">
+      <Card className="p-4 md:p-6 flex flex-col items-center justify-center min-h-[350px]">
         <h3 className="text-lg font-bold text-foreground mb-4 w-full text-left bg-muted p-2 rounded-lg">
           Asset Distribution
         </h3>
@@ -44,8 +57,8 @@ export function AssetDistributionChart({ data }: AssetDistributionChartProps) {
   }
 
   return (
-    <Card className="p-6">
-      <h3 className="text-lg font-bold text-foreground mb-6">
+    <Card className="p-4 md:p-6">
+      <h3 className="text-lg font-bold text-foreground mb-4 md:mb-6">
         Asset Distribution
       </h3>
       <ResponsiveContainer width="100%" height={300}>
@@ -54,8 +67,8 @@ export function AssetDistributionChart({ data }: AssetDistributionChartProps) {
             data={data}
             cx="50%"
             cy="50%"
-            innerRadius={60}
-            outerRadius={100}
+            innerRadius={isMobile ? 50 : 60}
+            outerRadius={isMobile ? 80 : 100}
             paddingAngle={5}
             dataKey="value"
             stroke="none"
@@ -83,9 +96,9 @@ export function AssetDistributionChart({ data }: AssetDistributionChartProps) {
             itemStyle={{ color: '#18181b', fontWeight: 500 }}
           />
           <Legend
-            verticalAlign="middle"
-            align="right"
-            layout="vertical"
+            verticalAlign={isMobile ? "bottom" : "middle"}
+            align={isMobile ? "center" : "right"}
+            layout={isMobile ? "horizontal" : "vertical"}
             iconType="circle"
             formatter={(value) => <span className="text-sm font-medium text-muted-foreground ml-2">{value}</span>}
           />

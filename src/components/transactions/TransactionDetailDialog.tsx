@@ -140,7 +140,7 @@ export function TransactionDetailDialog({
         <div className="space-y-6">
           {/* Basic Info */}
           <Card className="p-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <div className="text-sm text-muted-foreground">Date</div>
                 <div className="font-medium">
@@ -259,7 +259,7 @@ export function TransactionDetailDialog({
           {attachments.length > 0 && (
             <Card className="p-4">
               <h3 className="font-semibold mb-4">Attachments</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {attachments.map((attachment) => (
                   <div
                     key={attachment.id}

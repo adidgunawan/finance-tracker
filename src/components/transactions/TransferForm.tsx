@@ -133,7 +133,7 @@ export function TransferForm({ onSuccess }: TransferFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="date">
             Date *
@@ -176,44 +176,6 @@ export function TransferForm({ onSuccess }: TransferFormProps) {
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="from-account">
-            From Account *
-          </Label>
-          <Select value={fromAccountId} onValueChange={setFromAccountId}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select source account" />
-            </SelectTrigger>
-            <SelectContent>
-              {assetAccounts.map((account: Account) => (
-                <SelectItem key={account.id} value={account.id}>
-                  {account.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="to-account">
-            To Account *
-          </Label>
-          <Select value={toAccountId} onValueChange={setToAccountId}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select destination account" />
-            </SelectTrigger>
-            <SelectContent>
-              {assetAccounts.map((account: Account) => (
-                <SelectItem key={account.id} value={account.id}>
-                  {account.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
       <div className="space-y-3 pt-2">
         <div className="flex items-center gap-2">
           <input
@@ -229,7 +191,7 @@ export function TransferForm({ onSuccess }: TransferFormProps) {
         </div>
 
         {hasFee && (
-          <div className="grid grid-cols-2 gap-4 pl-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pl-6">
             <div className="space-y-2">
               <Label htmlFor="fee-amount">
                 Fee Amount *

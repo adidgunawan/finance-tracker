@@ -7,18 +7,18 @@ import { getDashboardData } from "@/actions/dashboard";
 // Loading skeleton component
 function DashboardSkeleton() {
   return (
-    <div className="min-h-screen bg-background p-8">
-      <div className="max-w-[98%] mx-auto space-y-6">
+    <div className="min-h-screen bg-background p-4 md:p-8">
+      <div className="max-w-7xl mx-auto space-y-6">
         <div className="animate-pulse">
           <div className="h-8 bg-muted rounded w-48 mb-2"></div>
           <div className="h-4 bg-muted rounded w-64"></div>
         </div>
-        <div className="grid grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {[1, 2, 3].map((i) => (
             <div key={i} className="h-32 bg-muted rounded animate-pulse"></div>
           ))}
         </div>
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="h-80 bg-muted rounded animate-pulse"></div>
           <div className="h-80 bg-muted rounded animate-pulse"></div>
         </div>
@@ -33,11 +33,11 @@ export default async function DashboardPage() {
   const data = await getDashboardData();
 
   return (
-    <div className="min-h-screen bg-background p-8">
-      <div className="max-w-[98%] mx-auto space-y-6">
+    <div className="min-h-screen bg-background p-4 md:p-8">
+      <div className="max-w-7xl mx-auto space-y-6">
         <div>
-          <h1 className="text-3xl font-semibold text-foreground">Dashboard</h1>
-          <p className="text-muted-foreground mt-1">
+          <h1 className="text-2xl md:text-3xl font-semibold text-foreground">Dashboard</h1>
+          <p className="text-sm md:text-base text-muted-foreground mt-1">
             Overview of your financial status
           </p>
         </div>
@@ -48,7 +48,7 @@ export default async function DashboardPage() {
           netCashFlow={data.netCashFlow}
         />
 
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-6">
           <MonthlyTrendChart data={data.monthlyData} />
           <AssetDistributionChart data={data.assetDistribution} />
         </div>

@@ -492,7 +492,7 @@ export function EditTransactionDialog({
           {fullTransaction.type === "transfer" ? (
             <>
               {/* Transfer Form */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="date">Date *</Label>
                   <Input
@@ -529,7 +529,7 @@ export function EditTransactionDialog({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="from-account">From Account *</Label>
                   <Select value={fromAccountId} onValueChange={setFromAccountId}>
@@ -578,7 +578,7 @@ export function EditTransactionDialog({
                 </div>
 
                 {hasFee && (
-                  <div className="grid grid-cols-2 gap-4 pl-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-6">
                     <div className="space-y-2">
                       <Label htmlFor="fee-amount">Fee Amount *</Label>
                       <Input
@@ -623,7 +623,7 @@ export function EditTransactionDialog({
           ) : (
             <>
               {/* Income/Expense Form */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="payer-payee">
                     {fullTransaction.type === "income" ? "Payee" : "Paid To"} (Optional)
@@ -653,7 +653,7 @@ export function EditTransactionDialog({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="date">Date *</Label>
                   <Input
@@ -686,7 +686,77 @@ export function EditTransactionDialog({
 
               <div className="space-y-2">
                 <Label>Line Items *</Label>
-                <div className="border rounded-lg overflow-hidden">
+                
+                {/* Mobile View: Stacked Cards */}
+                <div className="space-y-4 md:hidden">
+                    {lineItems.map((item, index) => (
+                        <div key={item.id} className="p-4 border rounded-lg space-y-3 bg-card">
+                            <div className="flex justify-between items-center">
+                                <h4 className="font-medium text-sm text-muted-foreground">Item {index + 1}</h4>
+                                {lineItems.length > 1 && (
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => removeLineItem(item.id)}
+                                        className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                                    >
+                                        <TrashIcon className="h-4 w-4" />
+                                    </Button>
+                                )}
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-xs">Description</Label>
+                                <Input
+                                    value={item.description}
+                                    onChange={(e) => updateLineItem(item.id, "description", e.target.value)}
+                                    placeholder={fullTransaction.type === "income" ? "e.g., Salary, Bonus" : "e.g., Moisturizer, Snacks"}
+                                    required
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-xs">Amount</Label>
+                                <Input
+                                   type="number"
+                                   step="0.01"
+                                   value={item.amount}
+                                   onChange={(e) => updateLineItem(item.id, "amount", e.target.value)}
+                                   placeholder="0.00"
+                                   required
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-xs">
+                                    {fullTransaction.type === "income" ? "Income Account" : "Expense Account"}
+                                </Label>
+                                <Select
+                                    value={fullTransaction.type === "income" ? item.incomeAccountId : item.expenseAccountId}
+                                    onValueChange={(value) =>
+                                        updateLineItem(
+                                            item.id,
+                                            fullTransaction.type === "income" ? "incomeAccountId" : "expenseAccountId",
+                                            value
+                                        )
+                                    }
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select account" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {(fullTransaction.type === "income" ? incomeAccounts : expenseAccounts).map((account: Account) => (
+                                            <SelectItem key={account.id} value={account.id}>
+                                                {account.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Desktop View: Table */}
+                <div className="hidden md:block border rounded-lg overflow-hidden">
                   <Table>
                     <TableHeader>
                       <TableRow>
