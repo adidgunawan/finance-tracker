@@ -38,7 +38,7 @@ export function TransactionCard({
       onClick={() => onClick(transaction)}
     >
       <div className="flex justify-between items-start mb-2">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-1 min-w-0 mr-3">
           <div className={cn(
             "w-10 h-10 rounded-full flex items-center justify-center shrink-0",
             isIncome && "bg-primary/10 text-primary",
@@ -49,8 +49,8 @@ export function TransactionCard({
             {isExpense && <ArrowTopRightIcon className="w-5 h-5" />}
             {isTransfer && <UpdateIcon className="w-5 h-5" />}
           </div>
-          <div className="min-w-0">
-            <h3 className="font-medium truncate pr-2 leading-tight">
+          <div className="min-w-0 flex-1">
+            <h3 className="font-medium leading-tight break-words">
               {transaction.description || "No description"}
             </h3>
             <p className="text-xs text-muted-foreground mt-1">

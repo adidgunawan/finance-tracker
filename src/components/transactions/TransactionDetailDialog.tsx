@@ -163,7 +163,7 @@ export function TransactionDetailDialog({
               </div>
               <div>
                 <div className="text-sm text-muted-foreground">Description</div>
-                <div className="font-medium">{transaction.description}</div>
+                <div className="font-medium break-words">{transaction.description}</div>
               </div>
               <div>
                 <div className="text-sm text-muted-foreground">Amount</div>

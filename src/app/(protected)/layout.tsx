@@ -43,11 +43,11 @@ export default function ProtectedLayout({
           </main>
         </SidebarInset>
         
-        {/* Mobile Navigation - fixed bottom */}
-        <MobileNav />
-        
         <InstallPrompt />
       </SidebarProvider>
+      
+      {/* Mobile Navigation - fixed bottom, moved outside provider to avoid context issues */}
+      <MobileNav />
     </AuthGuard>
   );
 }

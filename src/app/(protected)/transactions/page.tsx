@@ -125,7 +125,7 @@ export default function TransactionsPage() {
   }
 
   return (
-    <div className="min-h-screen p-4 md:p-8 animate-in fade-in duration-500 pb-24 md:pb-8">
+    <div className="min-h-screen p-4 md:p-8 animate-in fade-in duration-500 pb-24 md:pb-8 overflow-x-hidden">
       <div className="max-w-7xl mx-auto space-y-6 md:space-y-8">
         <div className="flex items-end justify-between">
             <div>
