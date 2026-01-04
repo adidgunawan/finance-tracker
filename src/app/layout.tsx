@@ -30,6 +30,8 @@ export const metadata: Metadata = {
   },
 };
 
+import { QueryProvider } from "@/providers/QueryProvider";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -38,8 +40,10 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="font-sans antialiased bg-background min-h-screen" suppressHydrationWarning>
-        {children}
-        <Toaster />
+        <QueryProvider>
+          {children}
+          <Toaster />
+        </QueryProvider>
       </body>
     </html>
   );

@@ -44,12 +44,19 @@ interface CreateTransactionData {
 }
 
 // Cached to deduplicate transaction fetches within the same request
-export const getTransactions = cache(async () => {
+// Cached to deduplicate transaction fetches within the same request
+export const getTransactions = cache(async (
+  page: number = 1, 
+  pageSize: number = 20
+) => {
   const session = await getSession();
   if (!session) throw new Error("Unauthorized");
 
   const supabase = createAdminClient();
-  const { data, error } = await supabase
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  const { data, count, error } = await supabase
     .from("transactions")
     .select(`
       *,
@@ -61,13 +68,17 @@ export const getTransactions = cache(async () => {
         )
       ),
       transaction_attachments(count)
-    `)
+    `, { count: 'exact' })
     .eq("user_id", session.user.id)
     .order("transaction_date", { ascending: false })
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .range(from, to);
 
   if (error) throw new Error(error.message);
-  return data || [];
+  return {
+    data: data || [],
+    count: count || 0
+  };
 });
 
 export async function createTransaction(data: CreateTransactionData) {

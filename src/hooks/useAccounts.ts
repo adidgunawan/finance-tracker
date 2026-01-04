@@ -12,64 +12,61 @@ import {
 type Account = Database["public"]["Tables"]["chart_of_accounts"]["Row"];
 type AccountInsert = Database["public"]["Tables"]["chart_of_accounts"]["Insert"];
 
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+
 export interface AccountNode extends Account {
   children: AccountNode[];
   level: number;
 }
 
 export function useAccounts() {
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    fetchAccounts();
-  }, []);
+  const {
+      data: accounts = [],
+      isLoading: loading,
+      error: queryError
+  } = useQuery({
+      queryKey: ['accounts'],
+      queryFn: async () => {
+          const data = await getAccounts();
+          return data || [];
+      },
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      gcTime: 30 * 60 * 1000,   // 30 minutes
+  });
 
-  const fetchAccounts = async () => {
-    try {
-      setLoading(true);
-      const data = await getAccounts();
-      setAccounts(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch accounts");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const error = queryError instanceof Error ? queryError.message : (queryError ? "Failed to fetch accounts" : null);
 
+  const { mutateAsync: addAccountMutation } = useMutation({
+    mutationFn: createAccount,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['accounts'] }),
+  });
+
+  const { mutateAsync: editAccountMutation } = useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: Partial<Account> }) => updateAccount(id, updates),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['accounts'] }),
+  });
+
+  const { mutateAsync: removeAccountMutation } = useMutation({
+    mutationFn: deleteAccount,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['accounts'] }),
+  });
+
+  // Wrappers to match existing API
   const addAccount = async (account: Omit<AccountInsert, "user_id">) => {
-    try {
-      const newAccount = await createAccount(account);
-      setAccounts((prev) => [...prev, newAccount]);
-      return newAccount;
-    } catch (err) {
-      throw err;
-    }
+    return addAccountMutation(account);
   };
 
   const editAccount = async (id: string, updates: Partial<Account>) => {
-    try {
-      const updatedAccount = await updateAccount(id, updates);
-      setAccounts((prev) =>
-        prev.map((acc) => (acc.id === id ? updatedAccount : acc))
-      );
-      return updatedAccount;
-    } catch (err) {
-      throw err;
-    }
+    return editAccountMutation({ id, updates });
   };
 
   const removeAccount = async (id: string) => {
-    try {
-      await deleteAccount(id);
-      setAccounts((prev) => prev.filter((acc) => acc.id !== id));
-    } catch (err) {
-      throw err;
-    }
+    return removeAccountMutation(id);
   };
 
-  // Build tree structure
+  // Build tree structure (memoized via function, but could use useMemo if expensive)
   const buildTree = (
     allAccounts: Account[],
     parentId: string | null = null,
@@ -84,6 +81,7 @@ export function useAccounts() {
       }));
   };
 
+  // Only rebuild tree if accounts change
   const accountsTree = buildTree(accounts);
 
   const getAccountsByType = (type: Account["type"]) => {
@@ -102,7 +100,7 @@ export function useAccounts() {
     createAccount: addAccount,
     updateAccount: editAccount,
     deleteAccount: removeAccount,
-    refreshAccounts: fetchAccounts,
+    refreshAccounts: () => queryClient.invalidateQueries({ queryKey: ['accounts'] }),
     getAccountsByType,
     getActiveAccounts,
   };

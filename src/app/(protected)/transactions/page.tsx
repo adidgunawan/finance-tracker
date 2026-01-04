@@ -27,6 +27,7 @@ import { TransactionDetailDialog } from "@/components/transactions/TransactionDe
 import { EditTransactionDialog } from "@/components/transactions/EditTransactionDialog";
 import { TransactionCard } from "@/components/transactions/TransactionCard";
 
+import { PaginationControls } from "@/components/ui/pagination-controls";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
 type Transaction = Database["public"]["Tables"]["transactions"]["Row"] & {
@@ -42,7 +43,20 @@ type Transaction = Database["public"]["Tables"]["transactions"]["Row"] & {
 type TransactionType = "income" | "expense" | "transfer";
 
 function TransactionsContent() {
-  const { transactions, loading, error, deleteTransaction, getTransaction, refreshTransactions } = useTransactions();
+  const { 
+    transactions, 
+    loading, 
+    error, 
+    deleteTransaction, 
+    getTransaction, 
+    refreshTransactions,
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    totalCount,
+    totalPages
+  } = useTransactions();
   const { format: formatCurrency } = useCurrency();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState("list");
@@ -134,9 +148,9 @@ function TransactionsContent() {
   }
 
   return (
-    <div className="min-h-screen p-4 md:p-8 animate-in fade-in duration-500 pb-24 md:pb-8 overflow-x-hidden">
-      <div className="max-w-[98%] mx-auto space-y-6 md:space-y-8">
-        <div className="flex items-end justify-between">
+    <div className="h-[calc(100vh-4rem)] p-4 md:px-8 md:py-4 animate-in fade-in duration-500 pb-24 md:pb-4 flex flex-col overflow-hidden">
+      <div className="max-w-[98%] mx-auto w-full flex flex-col h-full gap-4 md:gap-4">
+        <div className="flex-none flex items-end justify-between">
             <div>
             <h1 className="text-2xl md:text-3xl font-bold text-foreground">
                 Transactions
@@ -147,8 +161,8 @@ function TransactionsContent() {
             </div>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="hidden md:inline-flex">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0 space-y-4">
+            <TabsList className="flex-none hidden md:inline-flex w-fit">
                 <TabsTrigger value="list">
                     All Transactions
                 </TabsTrigger>
@@ -163,7 +177,7 @@ function TransactionsContent() {
                 </TabsTrigger>
             </TabsList>
 
-          <TabsContent value="list" className="m-0">
+          <TabsContent value="list" className="flex-1 flex flex-col min-h-0 m-0 data-[state=active]:flex">
             {transactions.length === 0 ? (
               <Card className="p-8 md:p-16 text-center flex flex-col items-center">
                 <h3 className="text-lg font-medium text-foreground mb-2">No transactions yet</h3>
@@ -186,97 +200,99 @@ function TransactionsContent() {
             ) : (
                 <>
                   {/* Desktop Table View */}
-                  <Card className="hidden md:block overflow-hidden">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="font-semibold pl-6">Date</TableHead>
-                          <TableHead className="font-semibold">Type</TableHead>
-                          <TableHead className="font-semibold">Description</TableHead>
-                          <TableHead className="font-semibold">Amount</TableHead>
-                          <TableHead className="font-semibold">Party</TableHead>
-                          <TableHead className="font-semibold">Ref</TableHead>
-                          <TableHead className="w-10"></TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {transactions.map((transaction) => (
-                          <TableRow
-                            key={transaction.id}
-                            className="group cursor-pointer hover:bg-accent/50"
-                            onClick={() => handleViewDetail(transaction.id)}
-                          >
-                            <TableCell className="text-muted-foreground pl-6 font-medium">
-                              {format(new Date(transaction.transaction_date), "MMM dd, yyyy")}
-                            </TableCell>
-                            <TableCell>
-                              <span
-                                className={`
-                                  inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold
-                                  ${
-                                    transaction.type === "income"
-                                      ? "bg-primary/10 text-primary border border-primary/20"
-                                      : transaction.type === "expense"
-                                      ? "bg-destructive/10 text-destructive border border-destructive/20"
-                                      : "bg-primary/10 text-primary border border-primary/20"
-                                  }
-                                `}
-                              >
-                                {transaction.type === "income" && <ArrowBottomLeftIcon className="mr-1 h-3 w-3" />}
-                                {transaction.type === "expense" && <ArrowTopRightIcon className="mr-1 h-3 w-3" />}
-                                {transaction.type === "transfer" && <UpdateIcon className="mr-1 h-3 w-3" />}
-                                {transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1)}
-                              </span>
-                            </TableCell>
-                            <TableCell className="text-foreground font-medium">
-                              <div className="flex items-center gap-2">
-                                <span>{transaction.description}</span>
-                                {transaction.transaction_attachments && transaction.transaction_attachments.length > 0 && (
-                                  <Paperclip className="w-4 h-4 text-muted-foreground shrink-0" />
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell className={`font-semibold ${transaction.type === 'income' ? 'text-primary' : 'text-foreground'}`}>
-                              {transaction.type === 'expense' ? '-' : ''}{formatCurrency(transaction.amount, { 
-                                currency: transaction.currency || "USD"
-                              })}
-                            </TableCell>
-                            <TableCell className="text-muted-foreground">
-                              {transaction.payee_payer || "-"}
-                            </TableCell>
-                            <TableCell className="text-muted-foreground text-xs font-mono">
-                              {transaction.transaction_id || ""}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleEdit(transaction);
-                                  }}
-                                  className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 opacity-0 group-hover:opacity-100 transition-all"
+                  <Card className="hidden md:flex flex-1 flex-col overflow-hidden border rounded-md">
+                    <div className="flex-1 overflow-auto">
+                        <Table>
+                        <TableHeader className="sticky top-0 bg-background z-10 shadow-sm">
+                            <TableRow>
+                            <TableHead className="font-semibold pl-6">Date</TableHead>
+                            <TableHead className="font-semibold">Type</TableHead>
+                            <TableHead className="font-semibold">Description</TableHead>
+                            <TableHead className="font-semibold">Amount</TableHead>
+                            <TableHead className="font-semibold">Party</TableHead>
+                            <TableHead className="font-semibold">Ref</TableHead>
+                            <TableHead className="w-10"></TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {transactions.map((transaction) => (
+                            <TableRow
+                                key={transaction.id}
+                                className="group cursor-pointer hover:bg-accent/50"
+                                onClick={() => handleViewDetail(transaction.id)}
+                            >
+                                <TableCell className="text-muted-foreground pl-6 font-medium">
+                                {format(new Date(transaction.transaction_date), "MMM dd, yyyy")}
+                                </TableCell>
+                                <TableCell>
+                                <span
+                                    className={`
+                                    inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold
+                                    ${
+                                        transaction.type === "income"
+                                        ? "bg-primary/10 text-primary border border-primary/20"
+                                        : transaction.type === "expense"
+                                        ? "bg-destructive/10 text-destructive border border-destructive/20"
+                                        : "bg-primary/10 text-primary border border-primary/20"
+                                    }
+                                    `}
                                 >
-                                  <UpdateIcon className="w-4 h-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDelete(transaction.id);
-                                  }}
-                                  className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all"
-                                >
-                                  <TrashIcon className="w-4 h-4" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                                    {transaction.type === "income" && <ArrowBottomLeftIcon className="mr-1 h-3 w-3" />}
+                                    {transaction.type === "expense" && <ArrowTopRightIcon className="mr-1 h-3 w-3" />}
+                                    {transaction.type === "transfer" && <UpdateIcon className="mr-1 h-3 w-3" />}
+                                    {transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1)}
+                                </span>
+                                </TableCell>
+                                <TableCell className="text-foreground font-medium">
+                                <div className="flex items-center gap-2">
+                                    <span>{transaction.description}</span>
+                                    {transaction.transaction_attachments && transaction.transaction_attachments.length > 0 && (
+                                    <Paperclip className="w-4 h-4 text-muted-foreground shrink-0" />
+                                    )}
+                                </div>
+                                </TableCell>
+                                <TableCell className={`font-semibold ${transaction.type === 'income' ? 'text-primary' : 'text-foreground'}`}>
+                                {transaction.type === 'expense' ? '-' : ''}{formatCurrency(transaction.amount, { 
+                                    currency: transaction.currency || "USD"
+                                })}
+                                </TableCell>
+                                <TableCell className="text-muted-foreground">
+                                {transaction.payee_payer || "-"}
+                                </TableCell>
+                                <TableCell className="text-muted-foreground text-xs font-mono">
+                                {transaction.transaction_id || ""}
+                                </TableCell>
+                                <TableCell>
+                                <div className="flex gap-1">
+                                    <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleEdit(transaction);
+                                    }}
+                                    className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 opacity-0 group-hover:opacity-100 transition-all"
+                                    >
+                                    <UpdateIcon className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDelete(transaction.id);
+                                    }}
+                                    className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all"
+                                    >
+                                    <TrashIcon className="w-4 h-4" />
+                                    </Button>
+                                </div>
+                                </TableCell>
+                            </TableRow>
+                            ))}
+                        </TableBody>
+                        </Table>
+                    </div>
                   </Card>
 
                   {/* Mobile List View */}
@@ -290,6 +306,28 @@ function TransactionsContent() {
                         onDelete={handleDelete}
                       />
                     ))}
+                  </div>
+
+                  <div className="flex-none hidden md:block border-t bg-background/50">
+                     <PaginationControls
+                        currentPage={page}
+                        totalPages={totalPages}
+                        pageSize={pageSize}
+                        totalCount={totalCount}
+                        onPageChange={setPage}
+                        onPageSizeChange={setPageSize}
+                     />
+                  </div>
+                  {/* Mobile Pagination */}
+                  <div className="md:hidden pb-20">
+                     <PaginationControls
+                        currentPage={page}
+                        totalPages={totalPages}
+                        pageSize={pageSize}
+                        totalCount={totalCount}
+                        onPageChange={setPage}
+                        onPageSizeChange={setPageSize}
+                     />
                   </div>
                 </>
             )}

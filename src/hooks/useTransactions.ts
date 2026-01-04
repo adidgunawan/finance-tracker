@@ -24,54 +24,81 @@ type Transaction = Database["public"]["Tables"]["transactions"]["Row"] & {
   transaction_attachments?: any[];
 };
 
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+
 export function useTransactions() {
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  
+  const { 
+    data: queryResult,
+    isLoading: loading, 
+    error: queryError 
+  } = useQuery({
+    queryKey: ['transactions', page, pageSize],
+    queryFn: async () => {
+      return await getTransactions(page, pageSize);
+    },
+     // Cache for 30 minutes, don't refetch on window focus
+     staleTime: 5 * 60 * 1000,
+     placeholderData: keepPreviousData,
+  });
 
-  useEffect(() => {
-    fetchTransactions();
-  }, []);
+  const transactions = queryResult?.data || [];
+  const totalCount = queryResult?.count || 0;
+  const totalPages = Math.ceil(totalCount / pageSize);
 
-  const fetchTransactions = async () => {
-    try {
-      setLoading(true);
-      // Only fetch if authenticated (handled by server action throwing)
-      const data = await getTransactions();
-      setTransactions(data);
-    } catch (err) {
-      console.error(err);
-      setError(err instanceof Error ? err.message : "Failed to fetch transactions");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const error = queryError instanceof Error ? queryError.message : (queryError ? "Failed to fetch" : null);
 
-  // Re-expose legacy functions wrapping server actions
+  // Legacy fetch function needed for refresh button (exposed as refreshTransactions)
+  const fetchTransactions = () => queryClient.invalidateQueries({ queryKey: ['transactions'] });
+
+
+  // Mutations
+  const { mutateAsync: createIncomeMutation } = useMutation({
+    mutationFn: async (params: any) => {
+        const { date, description, amount, incomeAccountId, assetAccountId, currency, exchangeRate } = params;
+        const lines = generateIncomeLines(incomeAccountId, assetAccountId, amount);
+        return await serverCreateTransaction({
+          transaction_date: date,
+          type: "income",
+          description,
+          amount,
+          currency,
+          exchange_rate: exchangeRate,
+          lines,
+        });
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['transactions'] }),
+  });
+
   const createIncome = async (
     date: string,
     description: string,
     amount: number,
     incomeAccountId: string,
     assetAccountId: string,
-    // New params optional for backward compat for now
     currency = "USD",
     exchangeRate = 1.0
   ) => {
-    const lines = generateIncomeLines(incomeAccountId, assetAccountId, amount);
-    const transaction = await serverCreateTransaction({
-      transaction_date: date,
-      type: "income",
-      description,
-      amount,
-      currency,
-      exchange_rate: exchangeRate,
-      lines,
-    });
-    setTransactions((prev) => [transaction, ...prev]);
-    return transaction;
+    return createIncomeMutation({ date, description, amount, incomeAccountId, assetAccountId, currency, exchangeRate });
   };
 
+  const { mutateAsync: createIncomeWithItemsMutation } = useMutation({
+    mutationFn: async (params: any) => {
+        // ... (complex logic moved here or kept in wrapper)
+        // For simplicity in this refactor, we'll keep the logic in the wrapper
+        // and just invalidate on success. A full refactor would move logic to server action.
+        return null; 
+    }
+  });
+
+
+  // COMPATIBILITY LAYER:
+  // Instead of full rewrite of all logic inside mutations, we wrap existing logic
+  // and simply INVALIDATE queries after success.
+  
   const createIncomeWithItems = async (
     date: string,
     lineItems: Array<{
@@ -86,6 +113,7 @@ export function useTransactions() {
     exchangeRate = 1.0,
     attachmentIds?: string[]
   ) => {
+    // ... (Keep existing logic to generate lines) ...
     const totalAmount = lineItems.reduce((sum, item) => sum + item.amount, 0);
     const mainDescription =
       lineItems.length === 1
@@ -119,15 +147,11 @@ export function useTransactions() {
     
     // Link attachments if provided
     if (attachmentIds && attachmentIds.length > 0 && transaction?.id) {
-      try {
-        await linkAttachmentsToTransaction(transaction.id, attachmentIds);
-      } catch (linkError) {
-        console.error("Failed to link attachments:", linkError);
-        throw new Error("Transaction created but failed to link attachments");
-      }
+       await linkAttachmentsToTransaction(transaction.id, attachmentIds);
     }
     
-    setTransactions((prev) => [transaction, ...prev]);
+    // SERVER STATE UPDATE
+    await queryClient.invalidateQueries({ queryKey: ['transactions'] });
     return transaction;
   };
 
@@ -152,7 +176,7 @@ export function useTransactions() {
       exchange_rate: exchangeRate,
       lines,
     });
-    setTransactions((prev) => [transaction, ...prev]);
+    await queryClient.invalidateQueries({ queryKey: ['transactions'] });
     return transaction;
   };
 
@@ -200,18 +224,12 @@ export function useTransactions() {
         expense_account_id: item.expenseAccountId,
       })),
     });
-    
-    // Link attachments if provided
+
     if (attachmentIds && attachmentIds.length > 0 && transaction?.id) {
-      try {
         await linkAttachmentsToTransaction(transaction.id, attachmentIds);
-      } catch (linkError) {
-        console.error("Failed to link attachments:", linkError);
-        throw new Error("Transaction created but failed to link attachments");
-      }
     }
-    
-    setTransactions((prev) => [transaction, ...prev]);
+
+    await queryClient.invalidateQueries({ queryKey: ['transactions'] });
     return transaction;
   };
 
@@ -244,26 +262,17 @@ export function useTransactions() {
       lines,
     });
     
-    // Link attachments if provided
     if (attachmentIds && attachmentIds.length > 0 && transaction?.id) {
-      try {
         await linkAttachmentsToTransaction(transaction.id, attachmentIds);
-      } catch (linkError) {
-        console.error("Failed to link attachments:", linkError);
-        throw new Error("Transaction created but failed to link attachments");
-      }
     }
     
-    setTransactions((prev) => [transaction, ...prev]);
+    await queryClient.invalidateQueries({ queryKey: ['transactions'] });
     return transaction;
   };
 
   const getTransaction = async (id: string) => {
-    try {
-      return await serverGetTransaction(id);
-    } catch (err) {
-      throw err;
-    }
+    // Try cache first? For now, keep as fetch
+    return await serverGetTransaction(id);
   };
 
   const updateTransaction = async (
@@ -276,13 +285,9 @@ export function useTransactions() {
       transaction_id?: string;
     }
   ) => {
-    try {
-      // Get the transaction to preserve type and lines
       const existing = transactions.find((t) => t.id === id);
       if (!existing) throw new Error("Transaction not found");
 
-      // For now, we'll just update basic fields
-      // Full line item editing would require more complex logic
       const updated = await serverUpdateTransaction(id, {
         transaction_date: data.transaction_date,
         description: data.description,
@@ -291,18 +296,13 @@ export function useTransactions() {
         transaction_id: data.transaction_id,
       });
 
-      setTransactions((prev) =>
-        prev.map((t) => (t.id === id ? { ...t, ...updated } : t))
-      );
+      await queryClient.invalidateQueries({ queryKey: ['transactions'] });
       return updated;
-    } catch (err) {
-      throw err;
-    }
   };
 
   const deleteTransaction = async (id: string) => {
     await serverDeleteTransaction(id);
-    setTransactions((prev) => prev.filter((t) => t.id !== id));
+    await queryClient.invalidateQueries({ queryKey: ['transactions'] });
   };
 
   return {
@@ -318,5 +318,12 @@ export function useTransactions() {
     updateTransaction,
     deleteTransaction,
     refreshTransactions: fetchTransactions,
+    // Pagination
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    totalCount,
+    totalPages,
   };
 }

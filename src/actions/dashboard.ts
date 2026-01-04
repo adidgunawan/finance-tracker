@@ -32,17 +32,34 @@ interface DashboardData {
  * OLD: 50+ sequential API calls for currency conversion (3-5 seconds)
  * NEW: 1-3 parallel API calls or 0 if cached (<500ms)
  */
-export const getDashboardData = cache(async (): Promise<DashboardData> => {
+import { unstable_cache } from "next/cache";
+
+// CACHED DASHBOARD DATA
+// Revalidates every 10 minutes or on demand
+export const getDashboardData = async (): Promise<DashboardData> => {
   const session = await getSession();
   if (!session) throw new Error("Unauthorized");
+  
+  const getCachedData = unstable_cache(
+      async (userId: string) => {
+        return await fetchDashboardDataInternal(userId);
+      },
+      [`dashboard-${session.user.id}`],
+      { tags: [`dashboard-${session.user.id}`], revalidate: 600 } 
+  );
 
+  return await getCachedData(session.user.id);
+};
+
+// Internal function with the actual fetching logic
+async function fetchDashboardDataInternal(userId: string): Promise<DashboardData> {
   const supabase = createAdminClient();
 
   // Get user's base currency
   const { data: settingsData } = await supabase
     .from("settings")
     .select("default_currency")
-    .eq("user_id", session.user.id)
+    .eq("user_id", userId)
     .maybeSingle();
   
   const baseCurrency = (settingsData as { default_currency: string } | null)?.default_currency || "IDR";
@@ -57,7 +74,7 @@ export const getDashboardData = cache(async (): Promise<DashboardData> => {
       supabase
         .from("transactions")
         .select("*")
-        .eq("user_id", session.user.id)
+        .eq("user_id", userId)
         .gte("transaction_date", currentMonthStart.toISOString().split("T")[0])
         .lte("transaction_date", currentMonthEnd.toISOString().split("T")[0]),
       
@@ -65,14 +82,14 @@ export const getDashboardData = cache(async (): Promise<DashboardData> => {
       supabase
         .from("transactions")
         .select("*")
-        .eq("user_id", session.user.id)
+        .eq("user_id", userId)
         .gte("transaction_date", subMonths(new Date(), 5).toISOString().split("T")[0]),
       
       // Asset accounts
       supabase
         .from("chart_of_accounts")
         .select("*")
-        .eq("user_id", session.user.id)
+        .eq("user_id", userId)
         .eq("type", "asset")
         .eq("is_active", true),
       
@@ -96,16 +113,6 @@ export const getDashboardData = cache(async (): Promise<DashboardData> => {
   const currentIncome = currentTransactions.filter((t) => t.type === "income");
   const currentExpense = currentTransactions.filter((t) => t.type === "expense");
 
-  console.log(`[Dashboard Debug] Current month: ${format(new Date(), "MMM yyyy")}`);
-  console.log(`[Dashboard Debug] Total transactions: ${currentTransactions.length}`);
-  console.log(`[Dashboard Debug] Income count: ${currentIncome.length}`);
-  console.log(`[Dashboard Debug] Expense count: ${currentExpense.length}`);
-  console.log(`[Dashboard Debug] Expenses:`, currentExpense.map(t => ({ 
-    desc: t.description, 
-    amount: t.amount, 
-    currency: t.currency 
-  })));
-
   const [convertedIncomeAmounts, convertedExpenseAmounts] = await Promise.all([
     convertToBaseCurrencyBatch(
       currentIncome.map((t) => ({ amount: t.amount, currency: t.currency || baseCurrency })),
@@ -119,9 +126,6 @@ export const getDashboardData = cache(async (): Promise<DashboardData> => {
 
   const totalIncome = convertedIncomeAmounts.reduce((sum, amt) => sum + amt, 0);
   const totalExpense = convertedExpenseAmounts.reduce((sum, amt) => sum + amt, 0);
-
-  console.log(`[Dashboard Debug] Total Income (converted): ${totalIncome}`);
-  console.log(`[Dashboard Debug] Total Expense (converted): ${totalExpense}`);
 
   // BATCH CONVERSION 2: Historical monthly data
   const monthlyMap = new Map<string, { income: number; expense: number }>();
@@ -222,4 +226,4 @@ export const getDashboardData = cache(async (): Promise<DashboardData> => {
     monthlyData,
     assetDistribution,
   };
-});
+}

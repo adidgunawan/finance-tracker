@@ -182,5 +182,10 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withPWA(nextConfig);
+// Configure bundle analyzer
+const withAnalyzer = require('@next/bundle-analyzer')({
+  enabled: process.env.ANALYZE === 'true',
+});
+
+export default withPWA(withAnalyzer(nextConfig));
 
