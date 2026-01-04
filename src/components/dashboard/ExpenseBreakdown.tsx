@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import {
   PieChart,
@@ -38,6 +38,14 @@ export function ExpenseBreakdown({ data }: ExpenseBreakdownProps) {
   const { format: formatCurrency } = useCurrency();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   // Filter out zero amounts and sort by amount desc
   const chartData = data
@@ -75,9 +83,9 @@ export function ExpenseBreakdown({ data }: ExpenseBreakdownProps) {
               <Pie
                 data={chartData}
                 cx="50%"
-                cy="50%"
-                innerRadius="50%"
-                outerRadius="80%"
+                cy={isMobile ? "40%" : "50%"}
+                innerRadius={isMobile ? 50 : 60}
+                outerRadius={isMobile ? 70 : 80}
                 paddingAngle={2}
                 dataKey="amount"
                 nameKey="category"
@@ -107,19 +115,27 @@ export function ExpenseBreakdown({ data }: ExpenseBreakdownProps) {
                  cursor={{ pointerEvents: 'none' }}
               />
               <Legend
-                 layout="vertical"
-                 verticalAlign="middle"
-                 align="right"
-                 wrapperStyle={{ paddingRight: '20px' }}
+                 layout={isMobile ? "horizontal" : "vertical"}
+                 verticalAlign={isMobile ? "bottom" : "middle"}
+                 align={isMobile ? "center" : "right"}
+                 wrapperStyle={isMobile ? { bottom: 0, left: 0, right: 0, padding: '0 10px 10px 10px' } : { paddingRight: '20px' }}
                  content={({ payload }) => (
-                   <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                   <div className={cn(
+                     "overflow-y-auto custom-scrollbar",
+                     isMobile 
+                       ? "flex flex-wrap justify-center gap-x-4 gap-y-2 max-h-[120px] w-full pt-4" 
+                       : "flex flex-col gap-2 max-h-[300px] pr-2"
+                   )}>
                      {payload?.map((entry: any, index: number) => {
                        const item = chartData.find(d => d.category === entry.value);
                        if (!item) return null;
                        return (
                          <div 
                            key={`legend-${index}`} 
-                           className="flex items-center justify-between text-xs group cursor-pointer hover:bg-muted/50 p-1 rounded transition-colors"
+                           className={cn(
+                             "flex items-center text-xs group cursor-pointer hover:bg-muted/50 p-1 rounded transition-colors",
+                             isMobile ? "border border-border/50 px-2 bg-muted/20" : "justify-between w-full"
+                           )}
                            onClick={() => handleSliceClick(item)}
                          >
                             <div className="flex items-center gap-2">
@@ -131,13 +147,15 @@ export function ExpenseBreakdown({ data }: ExpenseBreakdownProps) {
                                 {item.category}
                               </span>
                             </div>
-                            <div className="flex flex-col items-end ml-4">
+                            <div className={cn("flex items-center ml-2", isMobile ? "gap-2" : "flex-col items-end ml-4")}>
                                 <span className="font-bold text-foreground">
                                    {item.percentage.toFixed(1)}%
                                 </span>
-                                <span className="text-[10px] text-muted-foreground">
-                                   {formatCurrency(item.amount)}
-                                </span>
+                                {!isMobile && (
+                                  <span className="text-[10px] text-muted-foreground">
+                                     {formatCurrency(item.amount)}
+                                  </span>
+                                )}
                             </div>
                          </div>
                        );
