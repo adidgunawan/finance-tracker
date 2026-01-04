@@ -292,7 +292,24 @@ export function TransactionDetailDialog({
     return mimeType.startsWith("image/");
   };
 
-  if (!transaction) return null;
+  if (!transaction) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Transaction Details</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-6">
+            <Card className="p-4">
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+            </Card>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -303,8 +320,7 @@ export function TransactionDetailDialog({
 
         <div className="space-y-6">
           {/* Basic Info */}
-          <Card className="p-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Card className="p-4">\n            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <div className="text-sm text-muted-foreground">Date</div>
                 <div className="font-medium">
@@ -368,8 +384,8 @@ export function TransactionDetailDialog({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {transaction.transaction_line_items.map((item) => (
-                      <TableRow key={item.id}>
+                    {transaction.transaction_line_items.map((item, index) => (
+                      <TableRow key={item.id || `item-${index}`}>
                         <TableCell>{item.description}</TableCell>
                         <TableCell>
                           {item.expense_account?.name || item.income_account?.name || "N/A"}
@@ -397,8 +413,8 @@ export function TransactionDetailDialog({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {transaction.transaction_lines.map((line) => (
-                    <TableRow key={line.id}>
+                  {transaction.transaction_lines.map((line, index) => (
+                    <TableRow key={line.id || `line-${index}`}>
                       <TableCell>
                         {line.account?.name || "Unknown Account"}
                       </TableCell>

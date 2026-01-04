@@ -22,7 +22,6 @@ import { useCurrency } from "@/hooks/useCurrency";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { TrashIcon, PlusIcon, ArrowTopRightIcon, ArrowBottomLeftIcon, UpdateIcon } from "@radix-ui/react-icons";
-import { Paperclip } from "lucide-react";
 import { TransactionDetailDialog } from "@/components/transactions/TransactionDetailDialog";
 import { EditTransactionDialog } from "@/components/transactions/EditTransactionDialog";
 import { TransactionCard } from "@/components/transactions/TransactionCard";
@@ -84,10 +83,17 @@ function TransactionsContent() {
   };
 
   const handleViewDetail = async (id: string) => {
+    // Find the transaction from the current list for instant display
+    const transaction = transactions.find(t => t.id === id);
+    
+    // Open dialog immediately with existing data (if available)
+    setSelectedTransaction(transaction || null);
+    setDetailOpen(true);
+    
+    // Fetch full transaction details in the background
     try {
-      const transaction = await getTransaction(id);
-      setSelectedTransaction(transaction);
-      setDetailOpen(true);
+      const fullTransaction = await getTransaction(id);
+      setSelectedTransaction(fullTransaction);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to load transaction details");
     }
@@ -127,28 +133,10 @@ function TransactionsContent() {
   };
 
 
-  if (loading) {
-    return (
-        <div className="flex h-screen items-center justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
-    );
-  }
 
-  if (error) {
-    return (
-      <div className="min-h-screen p-4 md:p-8 flex items-center justify-center">
-         <Card className="border-destructive/20 p-6">
-            <p className="text-destructive">
-                {error}
-            </p>
-         </Card>
-      </div>
-    );
-  }
 
   return (
-    <div className="h-[calc(100vh-4rem)] p-4 md:px-8 md:py-4 animate-in fade-in duration-500 pb-24 md:pb-4 flex flex-col overflow-hidden">
+    <div className="h-[calc(100vh-4rem)] p-4 md:px-8 md:py-4 pb-24 md:pb-4 flex flex-col overflow-hidden">
       <div className="max-w-[98%] mx-auto w-full flex flex-col h-full gap-4 md:gap-4">
         <div className="flex-none flex items-end justify-between">
             <div>
@@ -178,7 +166,17 @@ function TransactionsContent() {
             </TabsList>
 
           <TabsContent value="list" className="flex-1 flex flex-col min-h-0 m-0 data-[state=active]:flex">
-            {transactions.length === 0 ? (
+            {error ? (
+              <Card className="border-destructive/20 p-6">
+                <p className="text-destructive text-center">{error}</p>
+              </Card>
+            ) : loading ? (
+              <Card className="p-8 text-center">
+                <div className="flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+              </Card>
+            ) : transactions.length === 0 ? (
               <Card className="p-8 md:p-16 text-center flex flex-col items-center">
                 <h3 className="text-lg font-medium text-foreground mb-2">No transactions yet</h3>
                 <p className="text-muted-foreground mb-6 max-w-sm">
@@ -244,12 +242,7 @@ function TransactionsContent() {
                                 </span>
                                 </TableCell>
                                 <TableCell className="text-foreground font-medium">
-                                <div className="flex items-center gap-2">
-                                    <span>{transaction.description}</span>
-                                    {transaction.transaction_attachments && transaction.transaction_attachments.length > 0 && (
-                                    <Paperclip className="w-4 h-4 text-muted-foreground shrink-0" />
-                                    )}
-                                </div>
+                                    {transaction.description}
                                 </TableCell>
                                 <TableCell className={`font-semibold ${transaction.type === 'income' ? 'text-primary' : 'text-foreground'}`}>
                                 {transaction.type === 'expense' ? '-' : ''}{formatCurrency(transaction.amount, { 

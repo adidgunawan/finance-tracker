@@ -135,7 +135,7 @@ export default function ReconcilePage() {
   }
 
   return (
-    <div className="min-h-screen p-8 animate-in fade-in duration-500">
+    <div className="min-h-screen p-8">
       <div className="max-w-[98%] mx-auto space-y-8">
         <div className="flex items-end justify-between">
           <div>

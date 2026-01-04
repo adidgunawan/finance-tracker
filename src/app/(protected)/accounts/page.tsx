@@ -160,28 +160,8 @@ export default function AccountsPage() {
   };
 
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background p-8">
-        <div className="max-w-[98%] mx-auto">
-          <p className="text-muted-foreground">Loading accounts...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-background p-8">
-        <div className="max-w-[98%] mx-auto">
-          <p className="text-destructive">Error: {error}</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-background p-8">
+   <div className="min-h-screen bg-background p-8">
       <div className="max-w-[98%] mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <div>
@@ -215,7 +195,15 @@ export default function AccountsPage() {
         </div>
 
         <Card className="p-6">
-          {accounts.length === 0 ? (
+          {error ? (
+            <div className="text-center py-12">
+              <p className="text-destructive">Error: {error}</p>
+            </div>
+          ) : loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : accounts.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-muted-foreground mb-4">
                 No accounts yet. Create your first account to get started.

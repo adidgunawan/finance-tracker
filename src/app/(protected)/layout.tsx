@@ -20,35 +20,35 @@ export default function ProtectedLayout({
   children: React.ReactNode;
 }) {
   return (
-    <AuthGuard>
-      <SidebarProvider>
-        {/* Desktop Sidebar - hidden on mobile */}
-        <div className="hidden md:block">
-          <AppSidebar />
-        </div>
-        
-        <SidebarInset>
-          {/* Desktop Header - hidden on mobile */}
-          <div className="hidden md:block">
-            <Header />
-          </div>
-
-          {/* Mobile Header - simplified if needed, or just content */}
-          {/* For now we just let content flow, MobileNav provides navigation */}
-          
-          <main className="flex-1 pb-20 md:pb-0">
-            <Suspense fallback={<LoadingFallback />}>
-              {children}
-            </Suspense>
-          </main>
-        </SidebarInset>
-        
-        <InstallPrompt />
-      </SidebarProvider>
+    <SidebarProvider>
+      {/* Desktop Sidebar - hidden on mobile */}
+      <div className="hidden md:block">
+        {/* Sidebar content doesn't need strict auth blocking for UI shell, 
+            data inside it will handle its own loading/auth states */}
+        <AppSidebar />
+      </div>
       
-      {/* Mobile Navigation - fixed bottom, moved outside provider to avoid context issues */}
+      <SidebarInset>
+        {/* Desktop Header */}
+        <div className="hidden md:block">
+          <Header />
+        </div>
+
+        <main className="flex-1 pb-20 md:pb-0">
+          {/* AuthGuard now only blocks the main content */}
+          <Suspense fallback={<LoadingFallback />}>
+            <AuthGuard>
+              {children}
+            </AuthGuard>
+          </Suspense>
+        </main>
+      </SidebarInset>
+      
+      <InstallPrompt />
+      
+      {/* Mobile Navigation */}
       <MobileNav />
-    </AuthGuard>
+    </SidebarProvider>
   );
 }
 
