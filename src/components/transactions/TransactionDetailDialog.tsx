@@ -22,7 +22,7 @@ import { useCurrency } from "@/hooks/useCurrency";
 import { format } from "date-fns";
 import type { Database } from "@/lib/supabase/types";
 import { getTransactionAttachments } from "@/actions/transactions";
-import { FileTextIcon, ExternalLinkIcon } from "@radix-ui/react-icons";
+import { FileTextIcon, ExternalLinkIcon, Pencil1Icon, TrashIcon } from "@radix-ui/react-icons";
 import { X } from "lucide-react";
 import { getDriveThumbnailUrl, getDriveFullImageUrl } from "@/lib/utils/google-drive";
 import { toast } from "sonner";
@@ -68,12 +68,16 @@ interface TransactionDetailDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   transaction: Transaction | null;
+  onEdit?: (transaction: Transaction) => void;
+  onDelete?: (id: string) => void;
 }
 
 export function TransactionDetailDialog({
   open,
   onOpenChange,
   transaction,
+  onEdit,
+  onDelete,
 }: TransactionDetailDialogProps) {
   const { format: formatCurrency } = useCurrency();
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -313,14 +317,57 @@ export function TransactionDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-3xl h-screen md:max-h-[90vh] md:h-auto overflow-hidden p-0 md:p-6 z-[200] flex flex-col [&>button]:hidden">
+        {/* Mobile Header with Actions */}
+        <div className="md:hidden shrink-0 bg-white dark:bg-gray-950 border-b px-4 py-3 flex items-center justify-between shadow-sm">
+          <DialogTitle className="text-lg font-semibold">Transaction Details</DialogTitle>
+          <div className="flex items-center gap-1">
+            {onEdit && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9"
+                onClick={() => {
+                  onEdit(transaction);
+                  onOpenChange(false);
+                }}
+              >
+                <Pencil1Icon className="h-4 w-4" />
+              </Button>
+            )}
+            {onDelete && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 text-destructive hover:text-destructive"
+                onClick={() => {
+                  onDelete(transaction.id);
+                  onOpenChange(false);
+                }}
+              >
+                <TrashIcon className="h-4 w-4" />
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9"
+              onClick={() => onOpenChange(false)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Desktop Header */}
+        <DialogHeader className="hidden md:block">
           <DialogTitle>Transaction Details</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6">
+        <div className="space-y-6 p-4 md:p-0 overflow-y-auto flex-1">
           {/* Basic Info */}
-          <Card className="p-4">\n            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Card className="p-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <div className="text-sm text-muted-foreground">Date</div>
                 <div className="font-medium">

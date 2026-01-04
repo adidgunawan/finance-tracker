@@ -421,6 +421,8 @@ function TransactionsContent() {
           open={detailOpen}
           onOpenChange={setDetailOpen}
           transaction={selectedTransaction}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
         />
 
         <EditTransactionDialog
