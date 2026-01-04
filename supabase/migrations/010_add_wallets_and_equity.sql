@@ -27,3 +27,4 @@ WHERE is_wallet = true;
 COMMENT ON COLUMN chart_of_accounts.is_wallet IS 'Indicates if this asset account is a wallet account';
 
 
+
