@@ -66,16 +66,16 @@ export default function BudgetsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background p-8">
+    <div className="min-h-screen bg-background p-4 md:p-8 pb-24 md:pb-8">
       <div className="max-w-[98%] mx-auto space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-semibold text-foreground">Budgets</h1>
-            <p className="text-muted-foreground mt-1">
+            <h1 className="text-2xl md:text-3xl font-semibold text-foreground">Budgets</h1>
+            <p className="text-sm md:text-base text-muted-foreground mt-1">
               Set and track your spending budgets
             </p>
           </div>
-          <Button onClick={handleCreate}>
+          <Button onClick={handleCreate} className="w-full md:w-auto">
             <PlusIcon className="h-4 w-4 mr-2" />
             Create Budget
           </Button>

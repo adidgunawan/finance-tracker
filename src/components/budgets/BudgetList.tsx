@@ -145,94 +145,190 @@ export function BudgetList({ onEdit, onViewComparison }: BudgetListProps) {
   };
 
   return (
-    <Card>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Account</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead>Budgeted</TableHead>
-            <TableHead>Progress</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {budgets.map((budget) => {
-            const progress = progressData[budget.id];
-            const budgetedAmount = getBudgetAmount(budget);
+    <>
+      {/* Desktop Table View */}
+      <Card className="hidden md:block">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Account</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Budgeted</TableHead>
+              <TableHead>Progress</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {budgets.map((budget) => {
+              const progress = progressData[budget.id];
+              const budgetedAmount = getBudgetAmount(budget);
 
-            return (
-              <TableRow key={budget.id}>
-                <TableCell className="font-medium">
-                  {budget.account?.name || "Unknown"}
-                </TableCell>
-                <TableCell>
-                  <Badge variant="outline">
+              return (
+                <TableRow key={budget.id}>
+                  <TableCell className="font-medium">
+                    {budget.account?.name || "Unknown"}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline">
+                      {getBudgetTypeLabel(budget.budget_type)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {formatCurrency(budgetedAmount)}
+                  </TableCell>
+                  <TableCell>
+                    {progress ? (
+                      <BudgetProgress
+                        budgeted={progress.budgeted}
+                        actual={progress.actual}
+                        remaining={progress.remaining}
+                        percentage={progress.percentage}
+                      />
+                    ) : (
+                      <span className="text-muted-foreground text-sm">
+                        Loading...
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={budget.is_active ? "default" : "secondary"}
+                      className="cursor-pointer"
+                      onClick={() => handleToggleStatus(budget.id)}
+                    >
+                      {budget.is_active ? "Active" : "Inactive"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      {onViewComparison && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onViewComparison(budget)}
+                          title="View Monthly Comparison"
+                        >
+                          <MagnifyingGlassIcon className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onEdit(budget)}
+                      >
+                        <UpdateIcon className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDelete(budget.id)}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </Card>
+
+      {/* Mobile Card View */}
+      <div className="md:hidden space-y-4">
+        {budgets.map((budget) => {
+          const progress = progressData[budget.id];
+          const budgetedAmount = getBudgetAmount(budget);
+
+          return (
+            <Card key={budget.id} className="p-4">
+              {/* Header: Account Name & Status */}
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-base truncate">
+                    {budget.account?.name || "Unknown"}
+                  </h3>
+                  <Badge variant="outline" className="mt-1.5">
                     {getBudgetTypeLabel(budget.budget_type)}
                   </Badge>
-                </TableCell>
-                <TableCell>
+                </div>
+                <Badge
+                  variant={budget.is_active ? "default" : "secondary"}
+                  className="cursor-pointer ml-2 shrink-0"
+                  onClick={() => handleToggleStatus(budget.id)}
+                >
+                  {budget.is_active ? "Active" : "Inactive"}
+                </Badge>
+              </div>
+
+              {/* Budget Amount */}
+              <div className="mb-3">
+                <p className="text-sm text-muted-foreground">Budgeted Amount</p>
+                <p className="text-xl font-bold">
                   {formatCurrency(budgetedAmount)}
-                </TableCell>
-                <TableCell>
-                  {progress ? (
+                </p>
+              </div>
+
+              {/* Progress */}
+              <div className="mb-4">
+                {progress ? (
+                  <div className="space-y-2">
                     <BudgetProgress
                       budgeted={progress.budgeted}
                       actual={progress.actual}
                       remaining={progress.remaining}
                       percentage={progress.percentage}
                     />
-                  ) : (
-                    <span className="text-muted-foreground text-sm">
-                      Loading...
-                    </span>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <Badge
-                    variant={budget.is_active ? "default" : "secondary"}
-                    className="cursor-pointer"
-                    onClick={() => handleToggleStatus(budget.id)}
-                  >
-                    {budget.is_active ? "Active" : "Inactive"}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex justify-end gap-2">
-                    {onViewComparison && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onViewComparison(budget)}
-                        title="View Monthly Comparison"
-                      >
-                        <MagnifyingGlassIcon className="h-4 w-4" />
-                      </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onEdit(budget)}
-                    >
-                      <UpdateIcon className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDelete(budget.id)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <TrashIcon className="h-4 w-4" />
-                    </Button>
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Spent: {formatCurrency(progress.actual)}</span>
+                      <span>Remaining: {formatCurrency(progress.remaining)}</span>
+                    </div>
                   </div>
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
-    </Card>
+                ) : (
+                  <span className="text-muted-foreground text-sm">
+                    Loading progress...
+                  </span>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-2 pt-3 border-t">
+                {onViewComparison && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => onViewComparison(budget)}
+                  >
+                    <MagnifyingGlassIcon className="h-4 w-4 mr-1.5" />
+                    View
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => onEdit(budget)}
+                >
+                  <UpdateIcon className="h-4 w-4 mr-1.5" />
+                  Edit
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-destructive hover:text-destructive border-destructive/20 hover:bg-destructive/10"
+                  onClick={() => handleDelete(budget.id)}
+                >
+                  <TrashIcon className="h-4 w-4" />
+                </Button>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+    </>
   );
 }
 

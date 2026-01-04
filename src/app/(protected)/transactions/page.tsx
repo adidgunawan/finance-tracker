@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import type { Database } from "@/lib/supabase/types";
 import {
   Table,
@@ -66,6 +67,12 @@ function TransactionsContent() {
   // Mobile creation state
   const [createOpen, setCreateOpen] = useState(false);
   const [createType, setCreateType] = useState<TransactionType>("income");
+  
+  // Mobile infinite scroll state
+  const [mobileTransactions, setMobileTransactions] = useState<Transaction[]>([]);
+  const [mobileLoading, setMobileLoading] = useState(false);
+  const hasMore = page < totalPages;
+  const lastLoadedPageRef = useRef(0);
 
   // Handle URL parameters for Quick Add
   useEffect(() => {
@@ -75,6 +82,34 @@ function TransactionsContent() {
       setCreateOpen(true);
     }
   }, [searchParams]);
+
+  // Update mobile transactions when page changes
+  useEffect(() => {
+    if (transactions.length > 0 && page !== lastLoadedPageRef.current) {
+      lastLoadedPageRef.current = page;
+      
+      if (page === 1) {
+        setMobileTransactions(transactions);
+      } else {
+        setMobileTransactions(prev => [...prev, ...transactions]);
+      }
+    }
+  }, [page, transactions.length]);
+
+  // Handle loading more transactions for mobile
+  const handleLoadMore = () => {
+    if (!loading && hasMore) {
+      setPage(page + 1);
+    }
+  };
+
+  // Infinite scroll hook for mobile
+  const { loadMoreRef } = useInfiniteScroll({
+    onLoadMore: handleLoadMore,
+    hasMore,
+    loading,
+    threshold: 200,
+  });
 
   const handleSuccess = () => {
     setActiveTab("list");
@@ -287,31 +322,42 @@ function TransactionsContent() {
                   </div>
                 </div>
 
-                {/* Mobile List View */}
-                <div className="md:hidden space-y-4">
-                  {transactions.map((transaction) => (
-                    <TransactionCard
-                      key={transaction.id}
-                      transaction={transaction}
-                      onClick={() => handleViewDetail(transaction.id)}
-                      onEdit={handleEdit}
-                      onDelete={handleDelete}
-                    />
-                  ))}
+                {/* Mobile List View with Infinite Scroll */}
+                <div className="md:hidden">
+                  <div className="border rounded-lg overflow-hidden">
+                    {mobileTransactions.map((transaction) => (
+                      <TransactionCard
+                        key={transaction.id}
+                        transaction={transaction}
+                        onClick={() => handleViewDetail(transaction.id)}
+                        onEdit={handleEdit}
+                        onDelete={handleDelete}
+                      />
+                    ))}
+                  </div>
+                  
+                  {/* Infinite scroll trigger */}
+                  {hasMore && (
+                    <div 
+                      ref={loadMoreRef}
+                      className="py-8 text-center"
+                    >
+                      <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                        Loading more...
+                      </div>
+                    </div>
+                  )}
+                  
+                  {!hasMore && mobileTransactions.length > 0 && (
+                    <div className="py-8 text-center text-sm text-muted-foreground">
+                      No more transactions
+                    </div>
+                  )}
                 </div>
 
-                {/* Pagination */}
+                {/* Pagination - Desktop Only */}
                 <div className="hidden md:block">
-                  <PaginationControls
-                    currentPage={page}
-                    totalPages={totalPages}
-                    pageSize={pageSize}
-                    totalCount={totalCount}
-                    onPageChange={setPage}
-                    onPageSizeChange={setPageSize}
-                  />
-                </div>
-                <div className="md:hidden pb-20">
                   <PaginationControls
                     currentPage={page}
                     totalPages={totalPages}
