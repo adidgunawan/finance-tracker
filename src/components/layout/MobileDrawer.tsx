@@ -130,18 +130,6 @@ export function MobileDrawer({ open, onOpenChange }: MobileDrawerProps) {
           <div className="px-2 space-y-1">
             <Button
               variant="ghost"
-              className="w-full justify-start h-10"
-              asChild
-              onClick={handleLinkClick}
-            >
-              <Link href="/settings">
-                <Settings className="mr-3 h-4 w-4" />
-                Settings
-              </Link>
-            </Button>
-            
-            <Button
-              variant="ghost"
               className="w-full justify-start h-10 text-destructive hover:text-destructive hover:bg-destructive/10"
               onClick={handleLogout}
             >

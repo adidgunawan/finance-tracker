@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Database } from "@/lib/supabase/types";
@@ -24,7 +25,7 @@ import { TrashIcon, PlusIcon, ArrowTopRightIcon, ArrowBottomLeftIcon, UpdateIcon
 import { TransactionDetailDialog } from "@/components/transactions/TransactionDetailDialog";
 import { EditTransactionDialog } from "@/components/transactions/EditTransactionDialog";
 import { TransactionCard } from "@/components/transactions/TransactionCard";
-import { FAB } from "@/components/layout/FAB";
+
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
 type Transaction = Database["public"]["Tables"]["transactions"]["Row"] & {
@@ -38,9 +39,10 @@ type Transaction = Database["public"]["Tables"]["transactions"]["Row"] & {
 
 type TransactionType = "income" | "expense" | "transfer";
 
-export default function TransactionsPage() {
+function TransactionsContent() {
   const { transactions, loading, error, deleteTransaction, getTransaction, refreshTransactions } = useTransactions();
   const { format: formatCurrency } = useCurrency();
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState("list");
   const [detailOpen, setDetailOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -49,6 +51,15 @@ export default function TransactionsPage() {
   // Mobile creation state
   const [createOpen, setCreateOpen] = useState(false);
   const [createType, setCreateType] = useState<TransactionType>("income");
+
+  // Handle URL parameters for Quick Add
+  useEffect(() => {
+    const addParam = searchParams.get('add');
+    if (addParam && ['income', 'expense', 'transfer'].includes(addParam)) {
+      setCreateType(addParam as TransactionType);
+      setCreateOpen(true);
+    }
+  }, [searchParams]);
 
   const handleSuccess = () => {
     setActiveTab("list");
@@ -99,10 +110,6 @@ export default function TransactionsPage() {
     });
   };
 
-  const openMobileCreate = (type: TransactionType) => {
-    setCreateType(type);
-    setCreateOpen(true);
-  };
 
   if (loading) {
     return (
@@ -346,11 +353,7 @@ export default function TransactionsPage() {
           onSave={handleSaveEdit}
         />
 
-        <FAB 
-          onAddIncome={() => openMobileCreate("income")}
-          onAddExpense={() => openMobileCreate("expense")}
-          onAddTransfer={() => openMobileCreate("transfer")}
-        />
+
 
         {/* Mobile Creation Sheet */}
         <Sheet open={createOpen} onOpenChange={setCreateOpen}>
@@ -371,5 +374,17 @@ export default function TransactionsPage() {
         </Sheet>
       </div>
     </div>
+  );
+}
+
+export default function TransactionsPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-screen items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    }>
+      <TransactionsContent />
+    </Suspense>
   );
 }
