@@ -1,47 +1,45 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
-import { useReports } from "@/hooks/useReports";
 import { useAccounts } from "@/hooks/useAccounts";
 import type { Database } from "@/lib/supabase/types";
-import { getMonthRange, getYearRange, formatDateRange } from "@/lib/utils/dateRange";
+import { getMonthRange, getYearRange } from "@/lib/utils/dateRange";
 
 type Account = Database["public"]["Tables"]["chart_of_accounts"]["Row"];
 
 interface ReportFiltersProps {
   onApply: () => void;
+  onFiltersChange?: (filters: {
+    startDate?: string;
+    endDate?: string;
+    accountIds?: string[];
+    transactionTypes?: ("income" | "expense" | "transfer")[];
+  }) => void;
 }
 
-export function ReportFilters({ onApply }: ReportFiltersProps) {
-  const { filters, updateFilters, resetFilters } = useReports();
+export function ReportFilters({ onApply, onFiltersChange }: ReportFiltersProps) {
   const { accounts } = useAccounts();
-  const [startDate, setStartDate] = useState(filters.startDate || "");
-  const [endDate, setEndDate] = useState(filters.endDate || "");
-  const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>(
-    filters.accountIds || []
-  );
-  const [selectedTypes, setSelectedTypes] = useState<("income" | "expense" | "transfer")[]>(
-    filters.transactionTypes || []
-  );
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
+  const [selectedTypes, setSelectedTypes] = useState<("income" | "expense" | "transfer")[]>([]);
 
   const handleApply = () => {
-    updateFilters({
+    const filters = {
       startDate: startDate || undefined,
       endDate: endDate || undefined,
       accountIds: selectedAccountIds.length > 0 ? selectedAccountIds : undefined,
       transactionTypes: selectedTypes.length > 0 ? selectedTypes : undefined,
-    });
+    };
+    
+    if (onFiltersChange) {
+      onFiltersChange(filters);
+    }
+    
     onApply();
   };
 
@@ -50,7 +48,11 @@ export function ReportFilters({ onApply }: ReportFiltersProps) {
     setEndDate("");
     setSelectedAccountIds([]);
     setSelectedTypes([]);
-    resetFilters();
+    
+    if (onFiltersChange) {
+      onFiltersChange({});
+    }
+    
     onApply();
   };
 

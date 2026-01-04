@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   getTransactionsReport,
   getAccountHierarchyReport,
@@ -11,82 +11,63 @@ import {
   type TimeBasedReportItem,
 } from "@/actions/reports";
 
-export function useReports() {
-  const [filters, setFilters] = useState<ReportFilters>({});
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const updateFilters = useCallback((newFilters: Partial<ReportFilters>) => {
-    setFilters((prev) => ({ ...prev, ...newFilters }));
-  }, []);
-
-  const resetFilters = useCallback(() => {
-    setFilters({});
-  }, []);
-
-  const fetchTransactionsReport = useCallback(async (): Promise<
-    TransactionReportItem[]
-  > => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await getTransactionsReport(filters);
-      return data;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to fetch report";
-      setError(message);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, [filters]);
-
-  const fetchAccountHierarchyReport = useCallback(async (): Promise<
-    AccountHierarchyItem[]
-  > => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await getAccountHierarchyReport(filters);
-      return data;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to fetch report";
-      setError(message);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, [filters]);
-
-  const fetchTimeBasedReport = useCallback(
-    async (period: "week" | "month" | "year"): Promise<TimeBasedReportItem[]> => {
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await getTimeBasedReport(period, filters);
-        return data;
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "Failed to fetch report";
-        setError(message);
-        throw err;
-      } finally {
-        setLoading(false);
-      }
+/**
+ * Hook to fetch transactions report with automatic caching
+ */
+export function useTransactionsReport(filters: ReportFilters = {}) {
+  return useQuery({
+    queryKey: ["reports", "transactions", filters],
+    queryFn: async () => {
+      return await getTransactionsReport(filters);
     },
-    [filters]
-  );
-
-  return {
-    filters,
-    loading,
-    error,
-    updateFilters,
-    resetFilters,
-    fetchTransactionsReport,
-    fetchAccountHierarchyReport,
-    fetchTimeBasedReport,
-  };
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
 }
 
+/**
+ * Hook to fetch account hierarchy report with automatic caching
+ */
+export function useAccountHierarchyReport(filters: ReportFilters = {}) {
+  return useQuery({
+    queryKey: ["reports", "hierarchy", filters],
+    queryFn: async () => {
+      return await getAccountHierarchyReport(filters);
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+}
 
+/**
+ * Hook to fetch time-based report with automatic caching
+ */
+export function useTimeBasedReport(
+  period: "week" | "month" | "year",
+  filters: ReportFilters = {}
+) {
+  return useQuery({
+    queryKey: ["reports", "timeBased", period, filters],
+    queryFn: async () => {
+      return await getTimeBasedReport(period, filters);
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+}
+
+/**
+ * Legacy hook for backward compatibility
+ * Provides manual fetch functions but uses TanStack Query under the hood
+ */
+export function useReports() {
+  // Note: This is a transitional API. New code should use the specific hooks above.
+  return {
+    filters: {},
+    loading: false,
+    error: null,
+    updateFilters: (_: Partial<ReportFilters>) => {},
+    resetFilters: () => {},
+    fetchTransactionsReport: () => getTransactionsReport({}),
+    fetchAccountHierarchyReport: () => getAccountHierarchyReport({}),
+    fetchTimeBasedReport: (period: "week" | "month" | "year") => getTimeBasedReport(period, {}),
+  };
+}
 

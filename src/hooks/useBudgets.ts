@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Database } from "@/lib/supabase/types";
 import {
   getBudgets as serverGetBudgets,
@@ -30,26 +30,87 @@ export interface BudgetProgress {
 }
 
 export function useBudgets() {
-  const [budgets, setBudgets] = useState<Budget[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    fetchBudgets();
-  }, []);
-
-  const fetchBudgets = async () => {
-    try {
-      setLoading(true);
+  // Fetch budgets with TanStack Query
+  const {
+    data: budgets = [],
+    isLoading: loading,
+    error: queryError,
+    refetch,
+  } = useQuery({
+    queryKey: ["budgets"],
+    queryFn: async () => {
       const data = await serverGetBudgets();
-      setBudgets(data as Budget[]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch budgets");
-    } finally {
-      setLoading(false);
-    }
-  };
+      return (data as Budget[]) || [];
+    },
+    staleTime: 10 * 60 * 1000, // 10 minutes
+  });
 
+  const error = queryError instanceof Error ? queryError.message : null;
+
+  // Create budget mutation
+  const { mutateAsync: createBudgetMutation } = useMutation({
+    mutationFn: async (params: {
+      accountId: string;
+      budgetType: "fixed_monthly" | "custom_monthly" | "date_range";
+      fixedAmount: number | null;
+      startDate: string | null;
+      endDate: string | null;
+      monthlyAmounts: { month: number; year: number; amount: number }[];
+    }) => {
+      return await serverCreateBudget(
+        params.accountId,
+        params.budgetType,
+        params.fixedAmount,
+        params.startDate,
+        params.endDate,
+        params.monthlyAmounts
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["budgets"] });
+    },
+  });
+
+  // Update budget mutation
+  const { mutateAsync: updateBudgetMutation } = useMutation({
+    mutationFn: async (params: {
+      id: string;
+      updates: {
+        accountId?: string;
+        budgetType?: "fixed_monthly" | "custom_monthly" | "date_range";
+        fixedAmount?: number | null;
+        startDate?: string | null;
+        endDate?: string | null;
+        isActive?: boolean;
+        monthlyAmounts?: { month: number; year: number; amount: number }[];
+      };
+    }) => {
+      return await serverUpdateBudget(params.id, params.updates);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["budgets"] });
+    },
+  });
+
+  // Toggle budget status mutation
+  const { mutateAsync: toggleBudgetStatusMutation } = useMutation({
+    mutationFn: serverToggleBudgetStatus,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["budgets"] });
+    },
+  });
+
+  // Delete budget mutation
+  const { mutateAsync: deleteBudgetMutation } = useMutation({
+    mutationFn: serverDeleteBudget,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["budgets"] });
+    },
+  });
+
+  // Wrapper functions to match existing API
   const createBudget = async (
     accountId: string,
     budgetType: "fixed_monthly" | "custom_monthly" | "date_range",
@@ -58,20 +119,14 @@ export function useBudgets() {
     endDate: string | null,
     monthlyAmounts: { month: number; year: number; amount: number }[] = []
   ) => {
-    try {
-      const newBudget = await serverCreateBudget(
-        accountId,
-        budgetType,
-        fixedAmount,
-        startDate,
-        endDate,
-        monthlyAmounts
-      );
-      await fetchBudgets(); // Refresh list
-      return newBudget;
-    } catch (err) {
-      throw err;
-    }
+    return createBudgetMutation({
+      accountId,
+      budgetType,
+      fixedAmount,
+      startDate,
+      endDate,
+      monthlyAmounts,
+    });
   };
 
   const updateBudget = async (
@@ -86,32 +141,15 @@ export function useBudgets() {
       monthlyAmounts?: { month: number; year: number; amount: number }[];
     }
   ) => {
-    try {
-      const updatedBudget = await serverUpdateBudget(id, updates);
-      await fetchBudgets(); // Refresh list
-      return updatedBudget;
-    } catch (err) {
-      throw err;
-    }
+    return updateBudgetMutation({ id, updates });
   };
 
   const toggleBudgetStatus = async (id: string) => {
-    try {
-      const updatedBudget = await serverToggleBudgetStatus(id);
-      await fetchBudgets(); // Refresh list
-      return updatedBudget;
-    } catch (err) {
-      throw err;
-    }
+    return toggleBudgetStatusMutation(id);
   };
 
   const deleteBudget = async (id: string) => {
-    try {
-      await serverDeleteBudget(id);
-      setBudgets((prev) => prev.filter((b) => b.id !== id));
-    } catch (err) {
-      throw err;
-    }
+    return deleteBudgetMutation(id);
   };
 
   const getBudgetProgress = async (
@@ -119,11 +157,7 @@ export function useBudgets() {
     month: number,
     year: number
   ): Promise<BudgetProgress> => {
-    try {
-      return await serverGetBudgetProgress(budgetId, month, year);
-    } catch (err) {
-      throw err;
-    }
+    return await serverGetBudgetProgress(budgetId, month, year);
   };
 
   return {
@@ -135,7 +169,6 @@ export function useBudgets() {
     deleteBudget,
     toggleBudgetStatus,
     getBudgetProgress,
-    refreshBudgets: fetchBudgets,
+    refreshBudgets: refetch,
   };
 }
-

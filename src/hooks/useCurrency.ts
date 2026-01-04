@@ -1,29 +1,21 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { getSettings } from "@/actions/settings";
 import { formatCurrency, getCurrencySymbol } from "@/lib/currency";
 
 export function useCurrency() {
-  const [currency, setCurrency] = useState<string>("IDR");
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    loadCurrency();
-  }, []);
-
-  const loadCurrency = async () => {
-    try {
+  const {
+    data: currency = "IDR",
+    isLoading: loading,
+  } = useQuery({
+    queryKey: ["settings", "currency"],
+    queryFn: async () => {
       const settings = await getSettings();
-      if (settings?.default_currency) {
-        setCurrency(settings.default_currency);
-      }
-    } catch (error) {
-      console.error("Failed to load currency:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+      return settings?.default_currency || "IDR";
+    },
+    staleTime: 30 * 60 * 1000, // 30 minutes - shares cache with useCurrencyConversion
+  });
 
   return {
     currency,

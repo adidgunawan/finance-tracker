@@ -1,91 +1,93 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ReportSummary } from "@/components/reports/ReportSummary";
 import { AccountHierarchyReport } from "@/components/reports/AccountHierarchyReport";
 import { TimeBasedReport } from "@/components/reports/TimeBasedReport";
-import { useReports } from "@/hooks/useReports";
+import {
+  useTransactionsReport,
+  useAccountHierarchyReport,
+  useTimeBasedReport,
+} from "@/hooks/useReports";
 import { useCurrency } from "@/hooks/useCurrency";
 import { exportTransactionsReport, exportTimeBasedReport } from "@/lib/reports/export";
 import { DownloadIcon, ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons";
 import { getMonthRange } from "@/lib/utils/dateRange";
-import { format, subMonths, addMonths, isSameMonth, startOfMonth } from "date-fns";
+import { format, subMonths, addMonths, isSameMonth } from "date-fns";
 
 export default function ReportsPage() {
-  const {
-    filters,
-    loading,
-    error,
-    updateFilters,
-    fetchTransactionsReport,
-    fetchAccountHierarchyReport,
-    fetchTimeBasedReport,
-  } = useReports();
   const { format: formatCurrency } = useCurrency();
-
   const [activeTab, setActiveTab] = useState("summary");
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
-  const [transactions, setTransactions] = useState<any[]>([]);
-  const [accountHierarchy, setAccountHierarchy] = useState<any[]>([]);
-  const [timeBasedData, setTimeBasedData] = useState<Record<string, any[]>>({});
-  const [summary, setSummary] = useState({
-    totalIncome: 0,
-    totalExpense: 0,
-    transactionCount: 0,
-  });
 
-  const loadReports = async () => {
-    try {
-      // Update filters with selected month range
-      const monthRange = getMonthRange(selectedMonth);
-      updateFilters({
-        startDate: monthRange.start.toISOString().split("T")[0],
-        endDate: monthRange.end.toISOString().split("T")[0],
-      });
-
-      // Load all reports
-      const [txData, hierarchyData, weekData, monthData, yearData] = await Promise.all([
-        fetchTransactionsReport(),
-        fetchAccountHierarchyReport(),
-        fetchTimeBasedReport("week"),
-        fetchTimeBasedReport("month"),
-        fetchTimeBasedReport("year"),
-      ]);
-
-      setTransactions(txData);
-      setAccountHierarchy(hierarchyData);
-
-      setTimeBasedData({
-        week: weekData,
-        month: monthData,
-        year: yearData,
-      });
-
-      // Calculate summary
-      const income = txData
-        .filter((t) => t.type === "income")
-        .reduce((sum, t) => sum + t.amount, 0);
-      const expense = txData
-        .filter((t) => t.type === "expense")
-        .reduce((sum, t) => sum + t.amount, 0);
-
-      setSummary({
-        totalIncome: income,
-        totalExpense: expense,
-        transactionCount: txData.length,
-      });
-    } catch (err) {
-      console.error("Failed to load reports:", err);
-    }
-  };
-
-  useEffect(() => {
-    loadReports();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Calculate filter based on selected month
+  const filters = useMemo(() => {
+    const monthRange = getMonthRange(selectedMonth);
+    return {
+      startDate: monthRange.start.toISOString().split("T")[0],
+      endDate: monthRange.end.toISOString().split("T")[0],
+    };
   }, [selectedMonth]);
+
+  // Fetch all reports with automatic caching
+  const {
+    data: transactions = [],
+    isLoading: transactionsLoading,
+    error: transactionsError,
+  } = useTransactionsReport(filters);
+
+  const {
+    data: accountHierarchy = [],
+    isLoading: hierarchyLoading,
+    error: hierarchyError,
+  } = useAccountHierarchyReport(filters);
+
+  const {
+    data: weekData = [],
+    isLoading: weekLoading,
+  } = useTimeBasedReport("week", filters);
+
+  const {
+    data: monthData = [],
+    isLoading: monthLoading,
+  } = useTimeBasedReport("month", filters);
+
+  const {
+    data: yearData = [],
+    isLoading: yearLoading,
+  } = useTimeBasedReport("year", filters);
+
+  // Combine loading states
+  const loading = transactionsLoading || hierarchyLoading || weekLoading || monthLoading || yearLoading;
+  const error = transactionsError || hierarchyError;
+
+  // Calculate summary from transactions
+  const summary = useMemo(() => {
+    const income = transactions
+      .filter((t) => t.type === "income")
+      .reduce((sum, t) => sum + t.amount, 0);
+    const expense = transactions
+      .filter((t) => t.type === "expense")
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    return {
+      totalIncome: income,
+      totalExpense: expense,
+      transactionCount: transactions.length,
+    };
+  }, [transactions]);
+
+  const timeBasedData = useMemo(
+    () => ({
+      week: weekData,
+      month: monthData,
+      year: yearData,
+    }),
+    [weekData, monthData, yearData]
+  );
 
   const handlePreviousMonth = () => {
     setSelectedMonth(subMonths(selectedMonth, 1));
@@ -115,7 +117,9 @@ export default function ReportsPage() {
       <div className="min-h-screen bg-background p-8">
         <div className="max-w-[98%] mx-auto">
           <Card className="p-6">
-            <div className="text-destructive">Error: {error}</div>
+            <div className="text-destructive">
+              Error: {error instanceof Error ? error.message : String(error)}
+            </div>
           </Card>
         </div>
       </div>

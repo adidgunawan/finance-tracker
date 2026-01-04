@@ -60,11 +60,11 @@ export function MatchSuggestionDialog({
   const loadTransactions = async () => {
     try {
       setLoading(true);
-      const allTransactions = await getTransactions();
+      // getTransactions now returns { data: [...], count: number }
+      const result = await getTransactions(1, 1000); // Get first 1000 transactions
       
-      // Filter transactions that involve this account
-      // For now, we'll get all transactions and let the matcher filter
-      setTransactions(allTransactions);
+      // Extract just the data array
+      setTransactions(result.data);
     } catch (error) {
       console.error("Failed to load transactions:", error);
     } finally {

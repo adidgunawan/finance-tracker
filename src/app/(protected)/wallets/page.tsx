@@ -1,52 +1,21 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { PlusIcon } from "@radix-ui/react-icons";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { WalletList } from "@/components/wallets/WalletList";
 import { AccountDialog } from "@/components/accounts/AccountDialog";
-import { getWalletsWithBalance } from "@/actions/wallets";
-import { createAccount, getAccounts } from "@/actions/accounts";
+import { useWallets } from "@/hooks/useWallets";
+import { useAccounts } from "@/hooks/useAccounts";
 import type { Database } from "@/lib/supabase/types";
-
-type Account = Database["public"]["Tables"]["chart_of_accounts"]["Row"];
-import type { WalletWithBalance } from "@/actions/wallets";
 
 type AccountType = Database["public"]["Tables"]["chart_of_accounts"]["Row"]["type"];
 
 export default function WalletsPage() {
-  const [wallets, setWallets] = useState<WalletWithBalance[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { wallets, loading, createWallet, refreshWallets } = useWallets();
+  const { accounts } = useAccounts();
   const [accountDialogOpen, setAccountDialogOpen] = useState(false);
-  const [accounts, setAccounts] = useState<Account[]>([]);
-
-  const loadWallets = async () => {
-    setLoading(true);
-    try {
-      const walletData = await getWalletsWithBalance();
-      setWallets(walletData);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to load wallets");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadAccounts = async () => {
-    try {
-      const accountData = await getAccounts();
-      setAccounts(accountData);
-    } catch (error) {
-      console.error("Failed to load accounts:", error);
-    }
-  };
-
-  useEffect(() => {
-    loadWallets();
-    loadAccounts();
-  }, []);
 
   const handleSaveAccount = async (data: {
     name: string;
@@ -57,15 +26,13 @@ export default function WalletsPage() {
     is_wallet?: boolean;
   }) => {
     try {
-      await createAccount({
+      await createWallet({
         ...data,
         type: "asset", // Force asset type for wallets
-        is_wallet: true, // Force wallet flag for new wallets from this page
+        is_wallet: true, // Force wallet flag
       });
       toast.success("Wallet created successfully");
       setAccountDialogOpen(false);
-      await loadAccounts();
-      await loadWallets();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to create wallet");
       throw error;
@@ -88,7 +55,7 @@ export default function WalletsPage() {
           </Button>
         </div>
 
-        <WalletList wallets={wallets} loading={loading} onRefresh={loadWallets} />
+        <WalletList wallets={wallets} loading={loading} onRefresh={refreshWallets} />
 
         <AccountDialog
           open={accountDialogOpen}

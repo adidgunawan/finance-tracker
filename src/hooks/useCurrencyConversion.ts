@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { getSettings } from "@/actions/settings";
 import { formatCurrency } from "@/lib/currency";
 import type { ConversionResult } from "@/lib/services/exchange-rate";
@@ -8,32 +9,28 @@ import type { ConversionResult } from "@/lib/services/exchange-rate";
 /**
  * React hook for currency conversion in UI components
  * Provides conversion functions and base currency info
+ * Uses TanStack Query for caching and deduplication
  */
 export function useCurrencyConversion() {
-  const [baseCurrency, setBaseCurrency] = useState<string>("IDR");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    loadBaseCurrency();
-  }, []);
-
-  const loadBaseCurrency = async () => {
-    try {
+  // Fetch base currency from settings
+  const {
+    data: baseCurrency = "IDR",
+    isLoading: loading,
+    error: queryError,
+  } = useQuery({
+    queryKey: ["settings", "currency"],
+    queryFn: async () => {
       const settings = await getSettings();
-      if (settings?.default_currency) {
-        setBaseCurrency(settings.default_currency);
-      }
-    } catch (err) {
-      console.error("Failed to load base currency:", err);
-      setError(err instanceof Error ? err.message : "Failed to load currency");
-    } finally {
-      setLoading(false);
-    }
-  };
+      return settings?.default_currency || "IDR";
+    },
+    staleTime: 30 * 60 * 1000, // 30 minutes
+  });
+
+  const error = queryError instanceof Error ? queryError.message : null;
 
   /**
    * Convert amount from one currency to another
+   * Results are automatically cached and deduplicated by TanStack Query
    */
   const convert = useCallback(
     async (
@@ -42,15 +39,15 @@ export function useCurrencyConversion() {
       toCurrency: string
     ): Promise<ConversionResult> => {
       try {
-        // Call server-side API endpoint for conversion
-        const response = await fetch("/api/currency/convert", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            amount,
-            fromCurrency,
-            toCurrency,
-          }),
+        // Build GET request URL
+        const params = new URLSearchParams({
+          amount: amount.toString(),
+          from: fromCurrency,
+          to: toCurrency,
+        });
+
+        const response = await fetch(`/api/currency/convert?${params}`, {
+          method: "GET",
         });
 
         if (!response.ok) {
@@ -110,6 +107,43 @@ export function useCurrencyConversion() {
     baseCurrency,
     loading,
     error,
-    refreshBaseCurrency: loadBaseCurrency,
   };
+}
+
+/**
+ * Hook to fetch and cache a specific currency conversion
+ * Automatically deduplicates requests with same parameters
+ */
+export function useCachedConversion(
+  amount: number,
+  fromCurrency: string,
+  toCurrency: string
+) {
+  return useQuery({
+    queryKey: ["currency", "convert", { from: fromCurrency, to: toCurrency, amount }],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        amount: amount.toString(),
+        from: fromCurrency,
+        to: toCurrency,
+      });
+
+      const response = await fetch(`/api/currency/convert?${params}`, {
+        method: "GET",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Conversion failed");
+      }
+
+      const result = await response.json();
+      return {
+        ...result,
+        rateTimestamp: new Date(result.rateTimestamp),
+      } as ConversionResult;
+    },
+    staleTime: 60 * 60 * 1000, // 1 hour
+    enabled: !!(amount && fromCurrency && toCurrency), // Only run when all params exist
+  });
 }
