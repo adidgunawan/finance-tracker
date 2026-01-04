@@ -481,14 +481,14 @@ export function EditTransactionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col p-0 gap-0">
+        <DialogHeader className="px-6 pt-6 pb-4 shrink-0">
           <DialogTitle>
             Edit {fullTransaction.type.charAt(0).toUpperCase() + fullTransaction.type.slice(1)} Transaction
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="space-y-4 px-6 overflow-y-auto flex-1 min-h-0">
           {fullTransaction.type === "transfer" ? (
             <>
               {/* Transfer Form */}
@@ -897,7 +897,7 @@ export function EditTransactionDialog({
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="px-6 py-4 shrink-0 border-t">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>

@@ -136,36 +136,36 @@ function TransactionsContent() {
 
 
   return (
-    <div className="h-[calc(100vh-4rem)] p-4 md:px-8 md:py-4 pb-24 md:pb-4 flex flex-col overflow-hidden">
-      <div className="max-w-[98%] mx-auto w-full flex flex-col h-full gap-4 md:gap-4">
-        <div className="flex-none flex items-end justify-between">
-            <div>
+    <div className="container mx-auto px-4 md:px-8 py-4 md:py-6 pb-24 md:pb-8">
+      <div className="space-y-6">
+        <div className="flex items-end justify-between">
+          <div>
             <h1 className="text-2xl md:text-3xl font-bold text-foreground">
-                Transactions
+              Transactions
             </h1>
             <p className="text-sm md:text-base text-muted-foreground mt-1 md:mt-2">
-                Manage your financial records
+              Manage your financial records
             </p>
-            </div>
+          </div>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0 space-y-4">
-            <TabsList className="flex-none hidden md:inline-flex w-fit">
-                <TabsTrigger value="list">
-                    All Transactions
-                </TabsTrigger>
-                <TabsTrigger value="income">
-                    <PlusIcon className="mr-2 h-4 w-4" /> New Income
-                </TabsTrigger>
-                <TabsTrigger value="expense">
-                    <ArrowTopRightIcon className="mr-2 h-4 w-4" /> New Expense
-                </TabsTrigger>
-                <TabsTrigger value="transfer">
-                    <UpdateIcon className="mr-2 h-4 w-4" /> New Transfer
-                </TabsTrigger>
-            </TabsList>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+          <TabsList className="flex-none hidden md:inline-flex w-fit">
+            <TabsTrigger value="list">
+              All Transactions
+            </TabsTrigger>
+            <TabsTrigger value="income">
+              <PlusIcon className="mr-2 h-4 w-4" /> New Income
+            </TabsTrigger>
+            <TabsTrigger value="expense">
+              <ArrowTopRightIcon className="mr-2 h-4 w-4" /> New Expense
+            </TabsTrigger>
+            <TabsTrigger value="transfer">
+              <UpdateIcon className="mr-2 h-4 w-4" /> New Transfer
+            </TabsTrigger>
+          </TabsList>
 
-          <TabsContent value="list" className="flex-1 flex flex-col min-h-0 m-0 data-[state=active]:flex">
+          <TabsContent value="list" className="space-y-4 mt-0">
             {error ? (
               <Card className="border-destructive/20 p-6">
                 <p className="text-destructive text-center">{error}</p>
@@ -187,188 +187,187 @@ function TransactionsContent() {
                     Add Income
                   </Button>
                   <Button onClick={() => setActiveTab("expense")} variant="secondary">
-                     Add Expense
+                    Add Expense
                   </Button>
                 </div>
-                {/* Mobile placeholder button */}
                 <div className="md:hidden">
-                   <p className="text-sm text-muted-foreground">Tap the + button to add one.</p>
+                  <p className="text-sm text-muted-foreground">Tap the + button to add one.</p>
                 </div>
               </Card>
             ) : (
-                <>
-                  {/* Desktop Table View */}
-                  <Card className="hidden md:flex flex-1 flex-col overflow-hidden border rounded-md">
-                    <div className="flex-1 overflow-auto">
-                        <Table>
-                        <TableHeader className="sticky top-0 bg-background z-10 shadow-sm">
-                            <TableRow>
-                            <TableHead className="font-semibold pl-6">Date</TableHead>
-                            <TableHead className="font-semibold">Type</TableHead>
-                            <TableHead className="font-semibold">Description</TableHead>
-                            <TableHead className="font-semibold">Amount</TableHead>
-                            <TableHead className="font-semibold">Party</TableHead>
-                            <TableHead className="font-semibold">Ref</TableHead>
-                            <TableHead className="w-10"></TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {transactions.map((transaction) => (
-                            <TableRow
-                                key={transaction.id}
-                                className="group cursor-pointer hover:bg-accent/50"
-                                onClick={() => handleViewDetail(transaction.id)}
-                            >
-                                <TableCell className="text-muted-foreground pl-6 font-medium">
-                                {format(new Date(transaction.transaction_date), "MMM dd, yyyy")}
-                                </TableCell>
-                                <TableCell>
-                                <span
-                                    className={`
-                                    inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold
-                                    ${
-                                        transaction.type === "income"
-                                        ? "bg-primary/10 text-primary border border-primary/20"
-                                        : transaction.type === "expense"
-                                        ? "bg-destructive/10 text-destructive border border-destructive/20"
-                                        : "bg-primary/10 text-primary border border-primary/20"
-                                    }
-                                    `}
+              <>
+                {/* Desktop Table View */}
+                <div className="hidden md:block border rounded-lg overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader className="sticky top-0 bg-background z-10 shadow-sm">
+                        <TableRow>
+                          <TableHead className="font-semibold pl-6">Date</TableHead>
+                          <TableHead className="font-semibold">Type</TableHead>
+                          <TableHead className="font-semibold">Description</TableHead>
+                          <TableHead className="font-semibold">Amount</TableHead>
+                          <TableHead className="font-semibold">Party</TableHead>
+                          <TableHead className="font-semibold">Ref</TableHead>
+                          <TableHead className="w-10"></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {transactions.map((transaction) => (
+                          <TableRow
+                            key={transaction.id}
+                            className="group cursor-pointer hover:bg-accent/50"
+                            onClick={() => handleViewDetail(transaction.id)}
+                          >
+                            <TableCell className="text-muted-foreground pl-6 font-medium">
+                              {format(new Date(transaction.transaction_date), "MMM dd, yyyy")}
+                            </TableCell>
+                            <TableCell>
+                              <span
+                                className={`
+                                  inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold
+                                  ${
+                                    transaction.type === "income"
+                                      ? "bg-primary/10 text-primary border border-primary/20"
+                                      : transaction.type === "expense"
+                                      ? "bg-destructive/10 text-destructive border border-destructive/20"
+                                      : "bg-primary/10 text-primary border border-primary/20"
+                                  }
+                                `}
+                              >
+                                {transaction.type === "income" && <ArrowBottomLeftIcon className="mr-1 h-3 w-3" />}
+                                {transaction.type === "expense" && <ArrowTopRightIcon className="mr-1 h-3 w-3" />}
+                                {transaction.type === "transfer" && <UpdateIcon className="mr-1 h-3 w-3" />}
+                                {transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1)}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-foreground font-medium">
+                              {transaction.description}
+                            </TableCell>
+                            <TableCell className={`font-semibold ${transaction.type === 'income' ? 'text-primary' : 'text-foreground'}`}>
+                              {transaction.type === 'expense' ? '-' : ''}{formatCurrency(transaction.amount, { 
+                                currency: transaction.currency || "USD"
+                              })}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {transaction.payee_payer || "-"}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground text-xs font-mono">
+                              {transaction.transaction_id || ""}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEdit(transaction);
+                                  }}
+                                  className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 opacity-0 group-hover:opacity-100 transition-all"
                                 >
-                                    {transaction.type === "income" && <ArrowBottomLeftIcon className="mr-1 h-3 w-3" />}
-                                    {transaction.type === "expense" && <ArrowTopRightIcon className="mr-1 h-3 w-3" />}
-                                    {transaction.type === "transfer" && <UpdateIcon className="mr-1 h-3 w-3" />}
-                                    {transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1)}
-                                </span>
-                                </TableCell>
-                                <TableCell className="text-foreground font-medium">
-                                    {transaction.description}
-                                </TableCell>
-                                <TableCell className={`font-semibold ${transaction.type === 'income' ? 'text-primary' : 'text-foreground'}`}>
-                                {transaction.type === 'expense' ? '-' : ''}{formatCurrency(transaction.amount, { 
-                                    currency: transaction.currency || "USD"
-                                })}
-                                </TableCell>
-                                <TableCell className="text-muted-foreground">
-                                {transaction.payee_payer || "-"}
-                                </TableCell>
-                                <TableCell className="text-muted-foreground text-xs font-mono">
-                                {transaction.transaction_id || ""}
-                                </TableCell>
-                                <TableCell>
-                                <div className="flex gap-1">
-                                    <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleEdit(transaction);
-                                    }}
-                                    className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 opacity-0 group-hover:opacity-100 transition-all"
-                                    >
-                                    <UpdateIcon className="w-4 h-4" />
-                                    </Button>
-                                    <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDelete(transaction.id);
-                                    }}
-                                    className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all"
-                                    >
-                                    <TrashIcon className="w-4 h-4" />
-                                    </Button>
-                                </div>
-                                </TableCell>
-                            </TableRow>
-                            ))}
-                        </TableBody>
-                        </Table>
-                    </div>
-                  </Card>
+                                  <UpdateIcon className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDelete(transaction.id);
+                                  }}
+                                  className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all"
+                                >
+                                  <TrashIcon className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
 
-                  {/* Mobile List View */}
-                  <div className="md:hidden space-y-4">
-                    {transactions.map((transaction) => (
-                      <TransactionCard
-                        key={transaction.id}
-                        transaction={transaction}
-                        onClick={() => handleViewDetail(transaction.id)}
-                        onEdit={handleEdit}
-                        onDelete={handleDelete}
-                      />
-                    ))}
-                  </div>
+                {/* Mobile List View */}
+                <div className="md:hidden space-y-4">
+                  {transactions.map((transaction) => (
+                    <TransactionCard
+                      key={transaction.id}
+                      transaction={transaction}
+                      onClick={() => handleViewDetail(transaction.id)}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                    />
+                  ))}
+                </div>
 
-                  <div className="flex-none hidden md:block border-t bg-background/50">
-                     <PaginationControls
-                        currentPage={page}
-                        totalPages={totalPages}
-                        pageSize={pageSize}
-                        totalCount={totalCount}
-                        onPageChange={setPage}
-                        onPageSizeChange={setPageSize}
-                     />
-                  </div>
-                  {/* Mobile Pagination */}
-                  <div className="md:hidden pb-20">
-                     <PaginationControls
-                        currentPage={page}
-                        totalPages={totalPages}
-                        pageSize={pageSize}
-                        totalCount={totalCount}
-                        onPageChange={setPage}
-                        onPageSizeChange={setPageSize}
-                     />
-                  </div>
-                </>
+                {/* Pagination */}
+                <div className="hidden md:block">
+                  <PaginationControls
+                    currentPage={page}
+                    totalPages={totalPages}
+                    pageSize={pageSize}
+                    totalCount={totalCount}
+                    onPageChange={setPage}
+                    onPageSizeChange={setPageSize}
+                  />
+                </div>
+                <div className="md:hidden pb-20">
+                  <PaginationControls
+                    currentPage={page}
+                    totalPages={totalPages}
+                    pageSize={pageSize}
+                    totalCount={totalCount}
+                    onPageChange={setPage}
+                    onPageSizeChange={setPageSize}
+                  />
+                </div>
+              </>
             )}
           </TabsContent>
 
-          <TabsContent value="income" className="mt-6 hidden md:block">
-            <Card className="p-8 max-w-5xl mx-auto">
-              <div className="flex items-center justify-between mb-8 border-b pb-6">
-                <div>
-                   <h2 className="text-xl font-bold text-foreground">New Income</h2>
-                   <p className="text-sm text-muted-foreground">Record money coming in</p>
-                </div>
-                <div className="h-10 w-10 bg-primary/10 rounded-full flex items-center justify-center text-primary">
-                    <PlusIcon className="h-6 w-6" />
-                </div>
+          <TabsContent value="income" className="hidden md:block space-y-6 mt-0">
+            <div className="flex items-center justify-between pb-4 border-b">
+              <div>
+                <h2 className="text-2xl font-bold text-foreground">New Income</h2>
+                <p className="text-sm text-muted-foreground mt-1">Record money coming in</p>
               </div>
+              <div className="h-12 w-12 bg-primary/10 rounded-full flex items-center justify-center text-primary">
+                <PlusIcon className="h-6 w-6" />
+              </div>
+            </div>
+            <div>
               <IncomeForm onSuccess={handleSuccess} />
-            </Card>
+            </div>
           </TabsContent>
 
-          <TabsContent value="expense" className="mt-6 hidden md:block">
-            <Card className="p-8 max-w-5xl mx-auto">
-              <div className="flex items-center justify-between mb-8 border-b pb-6">
-                <div>
-                   <h2 className="text-xl font-bold text-foreground">New Expense</h2>
-                   <p className="text-sm text-muted-foreground">Record money going out</p>
-                </div>
-                <div className="h-10 w-10 bg-destructive/10 rounded-full flex items-center justify-center text-destructive">
-                    <ArrowTopRightIcon className="h-6 w-6" />
-                </div>
+          <TabsContent value="expense" className="hidden md:block space-y-6 mt-0">
+            <div className="flex items-center justify-between pb-4 border-b">
+              <div>
+                <h2 className="text-2xl font-bold text-foreground">New Expense</h2>
+                <p className="text-sm text-muted-foreground mt-1">Record money going out</p>
               </div>
+              <div className="h-12 w-12 bg-destructive/10 rounded-full flex items-center justify-center text-destructive">
+                <ArrowTopRightIcon className="h-6 w-6" />
+              </div>
+            </div>
+            <div>
               <ExpenseForm onSuccess={handleSuccess} />
-            </Card>
+            </div>
           </TabsContent>
 
-          <TabsContent value="transfer" className="mt-6 hidden md:block">
-            <Card className="p-8 max-w-5xl mx-auto">
-               <div className="flex items-center justify-between mb-8 border-b pb-6">
-                <div>
-                   <h2 className="text-xl font-bold text-foreground">New Transfer</h2>
-                   <p className="text-sm text-muted-foreground">Move money between accounts</p>
-                </div>
-                <div className="h-10 w-10 bg-primary/10 rounded-full flex items-center justify-center text-primary">
-                    <UpdateIcon className="h-6 w-6" />
-                </div>
+          <TabsContent value="transfer" className="hidden md:block space-y-6 mt-0">
+            <div className="flex items-center justify-between pb-4 border-b">
+              <div>
+                <h2 className="text-2xl font-bold text-foreground">New Transfer</h2>
+                <p className="text-sm text-muted-foreground mt-1">Move money between accounts</p>
               </div>
+              <div className="h-12 w-12 bg-primary/10 rounded-full flex items-center justify-center text-primary">
+                <UpdateIcon className="h-6 w-6" />
+              </div>
+            </div>
+            <div>
               <TransferForm onSuccess={handleSuccess} />
-            </Card>
+            </div>
           </TabsContent>
         </Tabs>
 
@@ -391,38 +390,36 @@ function TransactionsContent() {
           onSave={handleSaveEdit}
         />
 
-
-
         {/* Mobile Creation Sheet */}
         <Sheet open={createOpen} onOpenChange={setCreateOpen}>
           <SheetContent side="bottom" className="h-[95vh] p-0 rounded-t-xl z-[200] flex flex-col">
-             <SheetHeader className="p-4 border-b shrink-0">
-                <SheetTitle>
-                    {createType === "income" && "New Income"}
-                    {createType === "expense" && "New Expense"}
-                    {createType === "transfer" && "New Transfer"}
-                </SheetTitle>
-             </SheetHeader>
-             
-             {/* Scrollable Content */}
-             <div className="flex-1 overflow-y-auto p-4">
-                {createType === "income" && <IncomeForm onSuccess={handleSuccess} hideSubmitButton />}
-                {createType === "expense" && <ExpenseForm onSuccess={handleSuccess} hideSubmitButton />}
-                {createType === "transfer" && <TransferForm onSuccess={handleSuccess} hideSubmitButton />}
-             </div>
+            <SheetHeader className="p-4 border-b shrink-0">
+              <SheetTitle>
+                {createType === "income" && "New Income"}
+                {createType === "expense" && "New Expense"}
+                {createType === "transfer" && "New Transfer"}
+              </SheetTitle>
+            </SheetHeader>
+            
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto p-4">
+              {createType === "income" && <IncomeForm onSuccess={handleSuccess} hideSubmitButton />}
+              {createType === "expense" && <ExpenseForm onSuccess={handleSuccess} hideSubmitButton />}
+              {createType === "transfer" && <TransferForm onSuccess={handleSuccess} hideSubmitButton />}
+            </div>
 
-             {/* Fixed Footer */}
-             <div className="shrink-0 border-t bg-background p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-                <Button 
-                  type="submit" 
-                  className="w-full h-12 text-base font-semibold"
-                  form={`${createType}-form`}
-                >
-                  {createType === "income" && "Create Income"}
-                  {createType === "expense" && "Create Expense"}
-                  {createType === "transfer" && "Create Transfer"}
-                </Button>
-             </div>
+            {/* Fixed Footer */}
+            <div className="shrink-0 border-t bg-background p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+              <Button 
+                type="submit" 
+                className="w-full h-12 text-base font-semibold"
+                form={`${createType}-form`}
+              >
+                {createType === "income" && "Create Income"}
+                {createType === "expense" && "Create Expense"}
+                {createType === "transfer" && "Create Transfer"}
+              </Button>
+            </div>
           </SheetContent>
         </Sheet>
       </div>
