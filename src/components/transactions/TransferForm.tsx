@@ -23,6 +23,7 @@ type Account = Database["public"]["Tables"]["chart_of_accounts"]["Row"];
 
 interface TransferFormProps {
   onSuccess?: () => void;
+  hideSubmitButton?: boolean;
 }
 
 interface FileAttachment {
@@ -35,7 +36,7 @@ interface FileAttachment {
   preview?: string;
 }
 
-export function TransferForm({ onSuccess }: TransferFormProps) {
+export function TransferForm({ onSuccess, hideSubmitButton = false }: TransferFormProps) {
   const { getAccountsByType } = useAccounts();
   const { createTransfer } = useTransactions();
 
@@ -132,7 +133,7 @@ export function TransferForm({ onSuccess }: TransferFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form id="transfer-form" onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="date">
@@ -174,6 +175,44 @@ export function TransferForm({ onSuccess }: TransferFormProps) {
           placeholder="e.g., Transfer to savings"
           required
         />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="from-account">
+            From Account *
+          </Label>
+          <Select value={fromAccountId} onValueChange={setFromAccountId}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select source account" />
+            </SelectTrigger>
+            <SelectContent>
+              {assetAccounts.map((account: Account) => (
+                <SelectItem key={account.id} value={account.id}>
+                  {account.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="to-account">
+            To Account *
+          </Label>
+          <Select value={toAccountId} onValueChange={setToAccountId}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select destination account" />
+            </SelectTrigger>
+            <SelectContent>
+              {assetAccounts.map((account: Account) => (
+                <SelectItem key={account.id} value={account.id}>
+                  {account.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="space-y-3 pt-2">
@@ -248,14 +287,16 @@ export function TransferForm({ onSuccess }: TransferFormProps) {
         />
       </div>
 
-      <div className="flex justify-end gap-2 pt-4">
-        <Button
-          type="submit"
-          disabled={loading}
-        >
-          {loading ? "Creating..." : "Create Transfer"}
-        </Button>
-      </div>
+      {!hideSubmitButton && (
+        <div className="flex justify-end gap-2 pt-4">
+          <Button
+            type="submit"
+            disabled={loading}
+          >
+            {loading ? "Creating..." : "Create Transfer"}
+          </Button>
+        </div>
+      )}
     </form>
   );
 }

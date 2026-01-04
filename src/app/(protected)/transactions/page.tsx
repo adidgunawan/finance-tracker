@@ -22,6 +22,7 @@ import { useCurrency } from "@/hooks/useCurrency";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { TrashIcon, PlusIcon, ArrowTopRightIcon, ArrowBottomLeftIcon, UpdateIcon } from "@radix-ui/react-icons";
+import { Paperclip } from "lucide-react";
 import { TransactionDetailDialog } from "@/components/transactions/TransactionDetailDialog";
 import { EditTransactionDialog } from "@/components/transactions/EditTransactionDialog";
 import { TransactionCard } from "@/components/transactions/TransactionCard";
@@ -35,6 +36,7 @@ type Transaction = Database["public"]["Tables"]["transactions"]["Row"] & {
       type: string;
     } | null;
   }[];
+  transaction_attachments?: any[];
 };
 
 type TransactionType = "income" | "expense" | "transfer";
@@ -133,7 +135,7 @@ function TransactionsContent() {
 
   return (
     <div className="min-h-screen p-4 md:p-8 animate-in fade-in duration-500 pb-24 md:pb-8 overflow-x-hidden">
-      <div className="max-w-7xl mx-auto space-y-6 md:space-y-8">
+      <div className="max-w-[98%] mx-auto space-y-6 md:space-y-8">
         <div className="flex items-end justify-between">
             <div>
             <h1 className="text-2xl md:text-3xl font-bold text-foreground">
@@ -227,7 +229,12 @@ function TransactionsContent() {
                               </span>
                             </TableCell>
                             <TableCell className="text-foreground font-medium">
-                              {transaction.description}
+                              <div className="flex items-center gap-2">
+                                <span>{transaction.description}</span>
+                                {transaction.transaction_attachments && transaction.transaction_attachments.length > 0 && (
+                                  <Paperclip className="w-4 h-4 text-muted-foreground shrink-0" />
+                                )}
+                              </div>
                             </TableCell>
                             <TableCell className={`font-semibold ${transaction.type === 'income' ? 'text-primary' : 'text-foreground'}`}>
                               {transaction.type === 'expense' ? '-' : ''}{formatCurrency(transaction.amount, { 
@@ -357,18 +364,33 @@ function TransactionsContent() {
 
         {/* Mobile Creation Sheet */}
         <Sheet open={createOpen} onOpenChange={setCreateOpen}>
-          <SheetContent side="bottom" className="h-[90vh] p-0 rounded-t-xl">
-             <SheetHeader className="p-4 border-b">
+          <SheetContent side="bottom" className="h-[95vh] p-0 rounded-t-xl z-[200] flex flex-col">
+             <SheetHeader className="p-4 border-b shrink-0">
                 <SheetTitle>
                     {createType === "income" && "New Income"}
                     {createType === "expense" && "New Expense"}
                     {createType === "transfer" && "New Transfer"}
                 </SheetTitle>
              </SheetHeader>
-             <div className="p-4 overflow-y-auto h-full pb-20">
-                {createType === "income" && <IncomeForm onSuccess={handleSuccess} />}
-                {createType === "expense" && <ExpenseForm onSuccess={handleSuccess} />}
-                {createType === "transfer" && <TransferForm onSuccess={handleSuccess} />}
+             
+             {/* Scrollable Content */}
+             <div className="flex-1 overflow-y-auto p-4">
+                {createType === "income" && <IncomeForm onSuccess={handleSuccess} hideSubmitButton />}
+                {createType === "expense" && <ExpenseForm onSuccess={handleSuccess} hideSubmitButton />}
+                {createType === "transfer" && <TransferForm onSuccess={handleSuccess} hideSubmitButton />}
+             </div>
+
+             {/* Fixed Footer */}
+             <div className="shrink-0 border-t bg-background p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+                <Button 
+                  type="submit" 
+                  className="w-full h-12 text-base font-semibold"
+                  form={`${createType}-form`}
+                >
+                  {createType === "income" && "Create Income"}
+                  {createType === "expense" && "Create Expense"}
+                  {createType === "transfer" && "Create Transfer"}
+                </Button>
              </div>
           </SheetContent>
         </Sheet>

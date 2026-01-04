@@ -19,7 +19,10 @@ import {
   generateTransferLines,
 } from "@/lib/accounting/double-entry";
 
-type Transaction = Database["public"]["Tables"]["transactions"]["Row"];
+type Transaction = Database["public"]["Tables"]["transactions"]["Row"] & {
+  transaction_lines?: any[];
+  transaction_attachments?: any[];
+};
 
 export function useTransactions() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);

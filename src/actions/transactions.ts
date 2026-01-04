@@ -59,7 +59,8 @@ export const getTransactions = cache(async () => {
           currency,
           type
         )
-      )
+      ),
+      transaction_attachments(count)
     `)
     .eq("user_id", session.user.id)
     .order("transaction_date", { ascending: false })

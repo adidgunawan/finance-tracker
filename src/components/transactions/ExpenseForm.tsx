@@ -34,6 +34,7 @@ type Account = Database["public"]["Tables"]["chart_of_accounts"]["Row"];
 
 interface ExpenseFormProps {
   onSuccess?: () => void;
+  hideSubmitButton?: boolean;
 }
 
 interface LineItem {
@@ -53,7 +54,7 @@ interface FileAttachment {
   preview?: string;
 }
 
-export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
+export function ExpenseForm({ onSuccess, hideSubmitButton = false }: ExpenseFormProps) {
   const { getAccountsByType } = useAccounts();
   const { createExpenseWithItems } = useTransactions();
 
@@ -172,7 +173,7 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form id="expense-form" onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="payer">Paid To (Optional)</Label>
@@ -390,11 +391,13 @@ export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
         />
       </div>
 
-      <div className="flex justify-end gap-2 pt-4">
-        <Button type="submit" disabled={loading}>
-          {loading ? "Creating..." : "Create Expense"}
-        </Button>
-      </div>
+      {!hideSubmitButton && (
+        <div className="flex justify-end gap-2 pt-4">
+          <Button type="submit" disabled={loading}>
+            {loading ? "Creating..." : "Create Expense"}
+          </Button>
+        </div>
+      )}
     </form>
   );
 }

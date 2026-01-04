@@ -34,6 +34,7 @@ type Account = Database["public"]["Tables"]["chart_of_accounts"]["Row"];
 
 interface IncomeFormProps {
   onSuccess?: () => void;
+  hideSubmitButton?: boolean;
 }
 
 interface LineItem {
@@ -53,7 +54,7 @@ interface FileAttachment {
   preview?: string;
 }
 
-export function IncomeForm({ onSuccess }: IncomeFormProps) {
+export function IncomeForm({ onSuccess, hideSubmitButton = false }: IncomeFormProps) {
   const { getAccountsByType } = useAccounts();
   const { createIncomeWithItems } = useTransactions();
 
@@ -173,7 +174,7 @@ export function IncomeForm({ onSuccess }: IncomeFormProps) {
   const { format: formatCurrency } = useCurrency();
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form id="income-form" onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="payee">Payee (Optional)</Label>
@@ -391,11 +392,13 @@ export function IncomeForm({ onSuccess }: IncomeFormProps) {
         />
       </div>
 
-      <div className="flex justify-end gap-2 pt-4">
-        <Button type="submit" disabled={loading}>
-          {loading ? "Creating..." : "Create Income"}
-        </Button>
-      </div>
+      {!hideSubmitButton && (
+        <div className="flex justify-end gap-2 pt-4">
+          <Button type="submit" disabled={loading}>
+            {loading ? "Creating..." : "Create Income"}
+          </Button>
+        </div>
+      )}
     </form>
   );
 }

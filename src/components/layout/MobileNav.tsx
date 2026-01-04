@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Home, FileText, Wallet, BarChart2, Plus, ArrowDownLeft, ArrowUpRight, RefreshCw, MoreHorizontal } from "lucide-react";
+import { Home, FileText, Target, BarChart2, Plus, ArrowDownLeft, ArrowUpRight, RefreshCw, MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MobileDrawer } from "./MobileDrawer";
 import { useState } from "react";
@@ -25,7 +25,7 @@ export function MobileNav() {
   ];
 
   const navigationRight = [
-    { name: "Wallets", href: "/wallets", icon: Wallet },
+    { name: "Budgets", href: "/budgets", icon: Target },
   ];
 
   const handleQuickAdd = (type: 'income' | 'expense' | 'transfer') => {

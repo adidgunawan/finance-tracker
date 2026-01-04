@@ -25,6 +25,7 @@ import { getTransactionAttachments } from "@/actions/transactions";
 import { FileTextIcon, ExternalLinkIcon } from "@radix-ui/react-icons";
 import { X } from "lucide-react";
 import { getDriveThumbnailUrl, getDriveFullImageUrl } from "@/lib/utils/google-drive";
+import { toast } from "sonner";
 
 type Transaction = Database["public"]["Tables"]["transactions"]["Row"] & {
   transaction_lines?: Array<{
@@ -78,6 +79,17 @@ export function TransactionDetailDialog({
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [loadingAttachments, setLoadingAttachments] = useState(false);
   const [viewingImage, setViewingImage] = useState<Attachment | null>(null);
+  const [rotation, setRotation] = useState(0);
+  const [brightness, setBrightness] = useState(100);
+  const [contrast, setContrast] = useState(100);
+  const [saturate, setSaturate] = useState(100);
+  const [grayscale, setGrayscale] = useState(0);
+  const [showFilters, setShowFilters] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [imageCacheBuster, setImageCacheBuster] = useState<number>(Date.now());
+  const [showVersionHistory, setShowVersionHistory] = useState(false);
+  const [versions, setVersions] = useState<Array<{ id: string; modifiedTime: string; size: string }>>([]);
+  const [loadingVersions, setLoadingVersions] = useState(false);
 
   useEffect(() => {
     if (open && transaction?.id) {
@@ -89,6 +101,158 @@ export function TransactionDetailDialog({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, transaction?.id]); // Note: loadAttachments is stable, so we don't need it in deps
+
+  // Reset rotation and filters when viewing a new image
+  useEffect(() => {
+    if (viewingImage) {
+      setRotation(0);
+      setBrightness(100);
+      setContrast(100);
+      setSaturate(100);
+      setGrayscale(0);
+      setShowFilters(false);
+    }
+  }, [viewingImage]);
+
+  const resetFilters = () => {
+    setRotation(0);
+    setBrightness(100);
+    setContrast(100);
+    setSaturate(100);
+    setGrayscale(0);
+  };
+
+  const handleSaveImage = async () => {
+    if (!viewingImage?.drive_file_id) return;
+    
+    setSaving(true);
+    try {
+      // Get the specific high-res image element from the editor
+      const mobileImg = document.getElementById('image-editor-target-mobile') as HTMLImageElement;
+      const desktopImg = document.getElementById('image-editor-target-desktop') as HTMLImageElement;
+      
+      // Prioritize the one that is visible (offsetParent is not null)
+      let img = (mobileImg?.offsetParent ? mobileImg : desktopImg) || mobileImg;
+      
+      if (!img) throw new Error("Image not found");
+
+      // Verify we have dimensions
+      if (img.naturalWidth === 0 || img.naturalHeight === 0) {
+        throw new Error("Image not fully loaded");
+      }
+
+      // Create canvas
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d', { alpha: true }); // Enable alpha for transparency
+      if (!ctx) throw new Error("Could not get canvas context");
+
+      // Set high quality smoothing
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+
+      // Handle rotation - swap dimensions if rotated 90 or 270 degrees
+      const isRotated = rotation === 90 || rotation === 270;
+      canvas.width = isRotated ? img.naturalHeight : img.naturalWidth;
+      canvas.height = isRotated ? img.naturalWidth : img.naturalHeight;
+
+      // Apply transformations
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate((rotation * Math.PI) / 180);
+      ctx.filter = `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturate}%) grayscale(${grayscale}%)`;
+      ctx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
+
+      // Determine output format based on filename to preserve quality
+      const isPng = viewingImage.filename.toLowerCase().endsWith('.png');
+      const mimeType = isPng ? 'image/png' : 'image/jpeg';
+      // Use maximum quality (1.0) for JPEGs, PNGs are lossless by default
+      const quality = 1.0;
+
+      // Convert to blob
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error("Failed to create blob"));
+        }, mimeType, quality);
+      });
+
+      // Upload to server
+      const formData = new FormData();
+      formData.append('file', blob, viewingImage.filename);
+      formData.append('driveFileId', viewingImage.drive_file_id);
+
+      const response = await fetch('/api/transactions/update-attachment', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) throw new Error("Failed to update attachment");
+
+      toast.success("Image updated successfully");
+      
+      // Close the viewer and reload attachments
+      setViewingImage(null);
+      
+      // Update cache buster to force image refresh
+      setImageCacheBuster(Date.now());
+      
+      // Wait a bit for Google Drive to process the update, then reload
+      setTimeout(async () => {
+        await loadAttachments();
+      }, 1000);
+    } catch (error) {
+      console.error("Failed to save image:", error);
+      toast.error("Failed to save image");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const loadVersionHistory = async () => {
+    if (!viewingImage?.drive_file_id) return;
+
+    setLoadingVersions(true);
+    try {
+      const response = await fetch(`/api/attachments/${viewingImage.drive_file_id}/versions`);
+      if (!response.ok) throw new Error("Failed to load versions");
+      
+      const data = await response.json();
+      // Reverse to show newest first
+      setVersions((data.versions || []).reverse());
+      setShowVersionHistory(true);
+    } catch (error) {
+      console.error("Failed to load version history:", error);
+      toast.error("Failed to load version history");
+    } finally {
+      setLoadingVersions(false);
+    }
+  };
+
+  const restoreVersion = async (revisionId: string) => {
+    if (!viewingImage?.drive_file_id) return;
+
+    try {
+      const response = await fetch(`/api/attachments/${viewingImage.drive_file_id}/versions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ revisionId }),
+      });
+
+      if (!response.ok) throw new Error("Failed to restore version");
+
+      toast.success("Version restored successfully");
+      setShowVersionHistory(false);
+      setViewingImage(null);
+      setImageCacheBuster(Date.now());
+      
+      setTimeout(async () => {
+        await loadAttachments();
+      }, 1000);
+    } catch (error) {
+      console.error("Failed to restore version:", error);
+      toast.error("Failed to restore version");
+    }
+  };
+
 
   const loadAttachments = async () => {
     if (!transaction?.id) return;
@@ -272,7 +436,7 @@ export function TransactionDetailDialog({
                       >
                         {attachment.drive_file_id ? (
                           <img
-                            src={getDriveThumbnailUrl(attachment.drive_file_id)}
+                            src={getDriveThumbnailUrl(attachment.drive_file_id, imageCacheBuster)}
                             alt={attachment.filename}
                             className="w-full h-full object-cover hover:opacity-90 transition-opacity"
                             onError={(e) => {
@@ -318,7 +482,7 @@ export function TransactionDetailDialog({
                         <Button
                           variant="outline"
                           size="sm"
-                          className="text-xs h-7"
+                          className="text-xs h-7 hidden md:inline-flex"
                           onClick={() => window.open(attachment.drive_download_link, "_blank")}
                         >
                           Download
@@ -336,63 +500,422 @@ export function TransactionDetailDialog({
       {/* Image View Dialog */}
       {viewingImage && (
         <Dialog open={!!viewingImage} onOpenChange={(open) => !open && setViewingImage(null)}>
-          <DialogContent className="!max-w-[90vw] !max-h-[90vh] w-[90vw] h-[90vh] p-0 m-0 rounded-lg border bg-background shadow-lg [&>button]:hidden">
-            <DialogTitle className="sr-only">{viewingImage.filename}</DialogTitle>
-            {/* Top Bar - Google Drive style */}
-            <div className="flex items-center justify-between px-4 py-3 border-b bg-background">
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setViewingImage(null)}
-                  className="p-1 hover:bg-muted rounded-full transition-colors"
-                  aria-label="Close"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-                <span className="text-sm font-medium truncate">{viewingImage.filename}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => window.open(viewingImage.drive_web_view_link, "_blank")}
-                  className="h-8"
-                >
-                  <ExternalLinkIcon className="h-4 w-4 mr-2" />
-                  Open in Drive
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => window.open(viewingImage.drive_download_link, "_blank")}
-                  className="h-8"
-                >
-                  Download
-                </Button>
-              </div>
-            </div>
+          {/* Main Image View Dialog - Google Drive Style (Full Screen) */}
+        <DialogContent className="!max-w-[100vw] !max-h-[100vh] w-screen h-screen p-0 m-0 rounded-none border-0 bg-black/95 backdrop-blur-sm z-[300] [&>button]:hidden flex flex-col overflow-hidden focus:outline-none">
+          <DialogTitle className="sr-only">{viewingImage.filename}</DialogTitle>
+          
+          <div className="relative w-full h-full flex flex-col bg-black/50">
+            {/* Close button for mobile/desktop (absolute top-right or handled in layout) */}
             
-            {/* Image Container */}
-            <div className="flex-1 flex items-center justify-center bg-muted/30 overflow-hidden">
-              {viewingImage.drive_file_id ? (
-                <img
-                  src={getDriveFullImageUrl(viewingImage.drive_file_id)}
-                  alt={viewingImage.filename}
-                  className="max-w-full max-h-full object-contain"
-                  onError={(e) => {
-                    console.error("Failed to load image:", viewingImage.drive_file_id);
-                    e.currentTarget.style.display = "none";
-                  }}
-                />
-              ) : (
-                <div className="flex items-center justify-center h-full">
-                  <FileTextIcon className="h-16 w-16 text-muted-foreground" />
+            {/* Mobile Layout - Flex Column */}
+            <div className="md:hidden h-full flex flex-col">
+              {/* Top Bar */}
+              <div className="shrink-0 bg-gradient-to-b from-black/90 to-transparent safe-top">
+                <div className="flex items-center justify-between px-3 py-3">
+                  <button
+                    onClick={() => setViewingImage(null)}
+                    className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                    aria-label="Close"
+                  >
+                    <X className="h-6 w-6 text-white" />
+                  </button>
+                  
+                  <button
+                    onClick={() => setShowFilters(!showFilters)}
+                    className={`p-2 rounded-full transition-colors ${showFilters ? 'bg-white/30' : 'bg-white/10'}`}
+                    title="Edit"
+                  >
+                    <svg className="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                    </svg>
+                  </button>
                 </div>
-              )}
+              </div>
+
+              {/* Image Container - Grows to fill available space */}
+              <div className="flex-1 flex items-center justify-center bg-black overflow-hidden min-h-0">
+                {viewingImage.drive_file_id ? (
+                  <>
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <div className="animate-spin rounded-full h-12 w-12 border-4 border-white/20 border-t-white"></div>
+                    </div>
+                    
+                    <img
+                      id="image-editor-target-mobile"
+                      src={getDriveFullImageUrl(viewingImage.drive_file_id, imageCacheBuster)}
+                      alt={viewingImage.filename}
+                      className="max-w-full max-h-full object-contain animate-in fade-in zoom-in-95 duration-300 transition-all"
+                      style={{ 
+                        transform: `rotate(${rotation}deg)`,
+                        filter: `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturate}%) grayscale(${grayscale}%)`
+                      }}
+                      onLoad={(e) => {
+                        const spinner = document.querySelector('.animate-spin');
+                        if (spinner) spinner.classList.add('hidden');
+                      }}
+                      onError={(e) => {
+                        console.error("Failed to load image:", viewingImage.drive_file_id);
+                        e.currentTarget.style.display = "none";
+                        const spinner = document.querySelector('.animate-spin');
+                        if (spinner) spinner.classList.add('hidden');
+                      }}
+                    />
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center justify-center gap-4 text-white/60">
+                    <FileTextIcon className="h-16 w-16" />
+                    <p className="text-sm">Preview not available</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Bottom Panel - Slides in/out by changing height */}
+              <div className={`shrink-0 bg-black/95 backdrop-blur-xl border-t border-white/10 transition-all duration-300 ${showFilters ? 'max-h-[400px]' : 'max-h-0 border-t-0'} overflow-hidden`}>
+                {/* Filter Controls */}
+                <div className="px-4 pt-4 pb-3 space-y-4">
+                  {/* Brightness */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <label className="text-sm font-medium text-white">Brightness</label>
+                      <span className="text-sm text-white/60">{brightness}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="200"
+                      value={brightness}
+                      onChange={(e) => setBrightness(Number(e.target.value))}
+                      className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-white"
+                      style={{
+                        background: `linear-gradient(to right, white ${(brightness / 200) * 100}%, rgba(255,255,255,0.2) ${(brightness / 200) * 100}%)`
+                      }}
+                    />
+                  </div>
+
+                  {/* Contrast */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <label className="text-sm font-medium text-white">Contrast</label>
+                      <span className="text-sm text-white/60">{contrast}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="200"
+                      value={contrast}
+                      onChange={(e) => setContrast(Number(e.target.value))}
+                      className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-white"
+                      style={{
+                        background: `linear-gradient(to right, white ${(contrast / 200) * 100}%, rgba(255,255,255,0.2) ${(contrast / 200) * 100}%)`
+                      }}
+                    />
+                  </div>
+
+                  {/* Saturation */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <label className="text-sm font-medium text-white">Saturation</label>
+                      <span className="text-sm text-white/60">{saturate}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="200"
+                      value={saturate}
+                      onChange={(e) => setSaturate(Number(e.target.value))}
+                      className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-white"
+                      style={{
+                        background: `linear-gradient(to right, white ${(saturate / 200) * 100}%, rgba(255,255,255,0.2) ${(saturate / 200) * 100}%)`
+                      }}
+                    />
+                  </div>
+
+                  {/* Black & White */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <label className="text-sm font-medium text-white">Black & White</label>
+                      <span className="text-sm text-white/60">{grayscale}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={grayscale}
+                      onChange={(e) => setGrayscale(Number(e.target.value))}
+                      className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-white"
+                      style={{
+                        background: `linear-gradient(to right, white ${grayscale}%, rgba(255,255,255,0.2) ${grayscale}%)`
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex items-center gap-2 px-4 py-3 border-t border-white/10 pb-safe">
+                  <button
+                    onClick={() => setRotation((prev) => (prev + 90) % 360)}
+                    className="flex-1 py-3 bg-white/10 hover:bg-white/20 rounded-lg transition-colors flex items-center justify-center gap-2"
+                  >
+                    <svg className="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <span className="text-sm font-medium text-white">Rotate</span>
+                  </button>
+                  
+                  <button
+                    onClick={loadVersionHistory}
+                    disabled={loadingVersions}
+                    className="flex-1 py-3 bg-white/10 hover:bg-white/20 rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    <span className="text-sm font-medium text-white">{loadingVersions ? "Loading..." : "History"}</span>
+                  </button>
+                  
+                  <button
+                    onClick={resetFilters}
+                    className="flex-1 py-3 bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
+                  >
+                    <span className="text-sm font-medium text-white">Reset</span>
+                  </button>
+                  
+                  <button
+                    onClick={handleSaveImage}
+                    disabled={saving}
+                    className="flex-1 py-3 bg-white hover:bg-white/90 rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    <span className="text-sm font-semibold text-black">{saving ? "Saving..." : "Save"}</span>
+                  </button>
+                </div>
+              </div>
             </div>
-          </DialogContent>
+
+            {/* Desktop Layout - Flex Column */}
+            <div className="hidden md:flex flex-col h-full bg-black">
+              {/* Top Bar */}
+              <div className="shrink-0 z-20 bg-gradient-to-b from-black/90 to-transparent">
+                <div className="flex items-center justify-between px-6 py-4">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <button
+                      onClick={() => setViewingImage(null)}
+                      className="p-2 hover:bg-white/10 rounded-full transition-colors shrink-0"
+                      aria-label="Close"
+                    >
+                      <X className="h-6 w-6 text-white" />
+                    </button>
+                    <span className="text-base font-medium text-white truncate">
+                      {viewingImage.filename}
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => setRotation((prev) => (prev + 90) % 360)}
+                      className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                      title="Rotate"
+                    >
+                      <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                    </button>
+                    
+                    <button
+                      onClick={() => setShowFilters(!showFilters)}
+                      className={`p-2 hover:bg-white/10 rounded-full transition-colors ${showFilters ? 'bg-white/20' : ''}`}
+                      title="Filters"
+                    >
+                      <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                      </svg>
+                    </button>
+
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={resetFilters}
+                      className="h-9 text-white hover:bg-white/10 hover:text-white"
+                    >
+                      Reset
+                    </Button>
+
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleSaveImage}
+                      disabled={saving}
+                      className="h-9 text-white hover:bg-white/10 hover:text-white"
+                    >
+                      {saving ? "Saving..." : "Save"}
+                    </Button>
+                    
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => window.open(viewingImage.drive_download_link, "_blank")}
+                      className="h-9 text-white hover:bg-white/10 hover:text-white"
+                    >
+                      Download
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Desktop Filters Panel */}
+                {showFilters && (
+                  <div className="px-6 pb-4 space-y-3 animate-in slide-in-from-top duration-200">
+                    <div className="bg-black/60 backdrop-blur-md rounded-lg p-4 space-y-3">
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-xs text-white/80">
+                          <label>Brightness</label>
+                          <span>{brightness}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="200"
+                          value={brightness}
+                          onChange={(e) => setBrightness(Number(e.target.value))}
+                          className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-xs text-white/80">
+                          <label>Contrast</label>
+                          <span>{contrast}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="200"
+                          value={contrast}
+                          onChange={(e) => setContrast(Number(e.target.value))}
+                          className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-xs text-white/80">
+                          <label>Saturation</label>
+                          <span>{saturate}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="200"
+                          value={saturate}
+                          onChange={(e) => setSaturate(Number(e.target.value))}
+                          className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-xs text-white/80">
+                          <label>Black & White</label>
+                          <span>{grayscale}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={grayscale}
+                          onChange={(e) => setGrayscale(Number(e.target.value))}
+                          className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {/* Desktop Image Container */}
+              <div className="flex-1 w-full min-h-0 flex items-center justify-center bg-black overflow-hidden p-4">
+                {viewingImage.drive_file_id ? (
+                  <>
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <div className="animate-spin rounded-full h-12 w-12 border-4 border-white/20 border-t-white"></div>
+                    </div>
+                    
+                    <img
+                      id="image-editor-target-desktop"
+                      src={getDriveFullImageUrl(viewingImage.drive_file_id, imageCacheBuster)}
+                      alt={viewingImage.filename}
+                      className="relative z-10 max-w-full max-h-full object-contain animate-in fade-in zoom-in-95 duration-300 transition-all"
+                      style={{ 
+                        transform: `rotate(${rotation}deg)`,
+                        filter: `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturate}%) grayscale(${grayscale}%)`
+                      }}
+                      onLoad={(e) => {
+                        const spinner = e.currentTarget.parentElement?.querySelector('.animate-spin');
+                        if (spinner) spinner.classList.add('hidden');
+                      }}
+                      onError={(e) => {
+                        console.error("Failed to load image:", viewingImage.drive_file_id);
+                        e.currentTarget.style.display = "none";
+                        const spinner = e.currentTarget.parentElement?.querySelector('.animate-spin');
+                        if (spinner) {
+                          spinner.classList.add('hidden');
+                          const errorDiv = document.createElement('div');
+                          errorDiv.className = 'text-white text-center';
+                          errorDiv.innerHTML = '<p class="text-lg mb-2">Failed to load image</p><p class="text-sm text-white/60">The image may have been moved or deleted</p>';
+                          e.currentTarget.parentElement?.appendChild(errorDiv);
+                        }
+                      }}
+                    />
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center justify-center gap-4 text-white/60">
+                    <FileTextIcon className="h-16 w-16" />
+                    <p className="text-sm">Preview not available</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </DialogContent>
         </Dialog>
       )}
+
+      {/* Version History Dialog */}
+      <Dialog open={showVersionHistory} onOpenChange={setShowVersionHistory}>
+        <DialogContent className="max-w-md z-[400]">
+          <DialogHeader>
+            <DialogTitle>Version History</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 max-h-[400px] overflow-y-auto">
+            {versions.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">No version history available</p>
+            ) : (
+              versions.map((version, index) => (
+                <div
+                  key={version.id}
+                  className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent cursor-pointer transition-colors"
+                  onClick={() => restoreVersion(version.id)}
+                >
+                  <div>
+                    <p className="text-sm font-medium">
+                      {index === 0 
+                        ? "Current Version" 
+                        : (index === versions.length - 1 
+                          ? "Original Version" 
+                          : `Version ${versions.length - index}`)
+                      }
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(version.modifiedTime).toLocaleString()}
+                    </p>
+                  </div>
+                  {index !== 0 && (
+                    <Button variant="outline" size="sm" onClick={(e) => {
+                      e.stopPropagation();
+                      restoreVersion(version.id);
+                    }}>
+                      Restore
+                    </Button>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }
-

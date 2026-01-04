@@ -53,3 +53,4 @@ const migrationFile = process.argv[2] || '003_fix_better_auth_schema.sql';
 runMigration(migrationFile);
 
 
+

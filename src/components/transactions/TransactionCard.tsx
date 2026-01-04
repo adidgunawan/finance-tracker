@@ -9,6 +9,7 @@ import {
   TrashIcon, 
   Pencil1Icon 
 } from "@radix-ui/react-icons";
+import { Paperclip } from "lucide-react";
 import { useCurrency } from "@/hooks/useCurrency";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -31,6 +32,7 @@ export function TransactionCard({
   const isIncome = transaction.type === "income";
   const isExpense = transaction.type === "expense";
   const isTransfer = transaction.type === "transfer";
+  const hasAttachments = transaction.transaction_attachments && transaction.transaction_attachments.length > 0;
 
   return (
     <Card 
@@ -50,9 +52,14 @@ export function TransactionCard({
             {isTransfer && <UpdateIcon className="w-5 h-5" />}
           </div>
           <div className="min-w-0 flex-1">
-            <h3 className="font-medium leading-tight break-words">
-              {transaction.description || "No description"}
-            </h3>
+            <div className="flex items-center gap-2">
+              <h3 className="font-medium leading-tight break-words">
+                {transaction.description || "No description"}
+              </h3>
+              {hasAttachments && (
+                <Paperclip className="w-4 h-4 text-muted-foreground shrink-0" />
+              )}
+            </div>
             <p className="text-xs text-muted-foreground mt-1">
               {transaction.payee_payer || (isTransfer ? "Transfer" : "-")}
             </p>

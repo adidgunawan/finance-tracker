@@ -276,3 +276,112 @@ export async function getFileMetadata(
     webContentLink: file.data.webContentLink || "",
   };
 }
+
+/**
+ * Update an existing file in Google Drive
+ * Google Drive automatically keeps version history
+ */
+export async function updateFile(
+  driveFileId: string,
+  fileBuffer: Buffer,
+  mimeType: string,
+  userId: string
+): Promise<void> {
+  const drive = await getDriveClientForUser(userId);
+
+  const media = {
+    mimeType,
+    body: Readable.from(fileBuffer),
+  };
+
+  try {
+    // Update with keepRevisionForever to ensure version is kept
+    await drive.files.update({
+      fileId: driveFileId,
+      media,
+      fields: "id, modifiedTime",
+      keepRevisionForever: false, // Let Google Drive manage revisions automatically
+    });
+    console.log(`File ${driveFileId} updated successfully`);
+  } catch (error: any) {
+    console.error("Update error:", error);
+    throw new Error(
+      `Failed to update file in Google Drive: ${error.message || "Unknown error"}`
+    );
+  }
+}
+
+/**
+ * Get version history of a file from Google Drive
+ */
+export async function getFileVersions(
+  driveFileId: string,
+  userId: string
+): Promise<Array<{
+  id: string;
+  modifiedTime: string;
+  size: string;
+}>> {
+  const drive = await getDriveClientForUser(userId);
+
+  try {
+    const response = await drive.revisions.list({
+      fileId: driveFileId,
+      fields: "revisions(id, modifiedTime, size)",
+    });
+
+    const revisions = response.data.revisions || [];
+    console.log(`Found ${revisions.length} revisions for file ${driveFileId}`);
+    return revisions
+      .filter((rev) => rev.id && rev.modifiedTime)
+      .map((rev) => ({
+        id: rev.id!,
+        modifiedTime: rev.modifiedTime!,
+        size: rev.size || "0",
+      }));
+  } catch (error: any) {
+    console.error("Error getting file versions:", error);
+    throw new Error(`Failed to get file versions: ${error.message || "Unknown error"}`);
+  }
+}
+
+/**
+ * Restore a specific version of a file
+ */
+export async function restoreFileVersion(
+  driveFileId: string,
+  revisionId: string,
+  userId: string
+): Promise<void> {
+  const drive = await getDriveClientForUser(userId);
+
+  try {
+    // Get the revision content
+    const response = await drive.revisions.get(
+      {
+        fileId: driveFileId,
+        revisionId: revisionId,
+        alt: "media",
+      },
+      { responseType: "arraybuffer" }
+    );
+
+    // Update the file with the old version's content
+    const buffer = Buffer.from(response.data as ArrayBuffer);
+    const media = {
+      mimeType: "image/jpeg",
+      body: Readable.from(buffer),
+    };
+
+    await drive.files.update({
+      fileId: driveFileId,
+      media,
+      fields: "id, modifiedTime",
+    });
+
+    console.log(`File ${driveFileId} restored to revision ${revisionId}`);
+  } catch (error: any) {
+    console.error("Error restoring file version:", error);
+    throw new Error(`Failed to restore file version: ${error.message || "Unknown error"}`);
+  }
+}
