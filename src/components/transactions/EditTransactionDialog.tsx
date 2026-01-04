@@ -481,7 +481,7 @@ export function EditTransactionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col p-0 gap-0">
+      <DialogContent className="max-w-5xl h-screen md:max-h-[90vh] md:h-auto flex flex-col p-0 gap-0">
         <DialogHeader className="px-6 pt-6 pb-4 shrink-0">
           <DialogTitle>
             Edit {fullTransaction.type.charAt(0).toUpperCase() + fullTransaction.type.slice(1)} Transaction

@@ -392,13 +392,46 @@ function TransactionsContent() {
 
         {/* Mobile Creation Sheet */}
         <Sheet open={createOpen} onOpenChange={setCreateOpen}>
-          <SheetContent side="bottom" className="h-[95vh] p-0 rounded-t-xl z-[200] flex flex-col">
-            <SheetHeader className="p-4 border-b shrink-0">
-              <SheetTitle>
-                {createType === "income" && "New Income"}
-                {createType === "expense" && "New Expense"}
-                {createType === "transfer" && "New Transfer"}
-              </SheetTitle>
+          <SheetContent side="bottom" className="h-screen p-0 z-[200] flex flex-col">
+            <SheetHeader className="p-4 border-b shrink-0 space-y-3">
+              <SheetTitle className="text-center">New Transaction</SheetTitle>
+              
+              {/* Transaction Type Selector */}
+              <div className="flex gap-2 bg-muted/50 p-1 rounded-lg">
+                <button
+                  onClick={() => setCreateType("income")}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-md text-sm font-medium transition-all ${
+                    createType === "income"
+                      ? "bg-background text-primary shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <ArrowBottomLeftIcon className="h-4 w-4" />
+                  Income
+                </button>
+                <button
+                  onClick={() => setCreateType("expense")}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-md text-sm font-medium transition-all ${
+                    createType === "expense"
+                      ? "bg-background text-destructive shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <ArrowTopRightIcon className="h-4 w-4" />
+                  Expense
+                </button>
+                <button
+                  onClick={() => setCreateType("transfer")}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-md text-sm font-medium transition-all ${
+                    createType === "transfer"
+                      ? "bg-background text-primary shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <UpdateIcon className="h-4 w-4" />
+                  Transfer
+                </button>
+              </div>
             </SheetHeader>
             
             {/* Scrollable Content */}
