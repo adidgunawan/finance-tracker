@@ -49,7 +49,7 @@ export function useBudgets() {
 
   const error = queryError instanceof Error ? queryError.message : null;
 
-  // Create budget mutation
+  // Create budget mutation with optimistic updates
   const { mutateAsync: createBudgetMutation } = useMutation({
     mutationFn: async (params: {
       accountId: string;
@@ -68,7 +68,35 @@ export function useBudgets() {
         params.monthlyAmounts
       );
     },
-    onSuccess: () => {
+    onMutate: async (newBudget) => {
+      await queryClient.cancelQueries({ queryKey: ["budgets"] });
+      const previous = queryClient.getQueryData(["budgets"]);
+      
+      // Optimistically add new budget
+      queryClient.setQueryData(["budgets"], (old: Budget[] = []) => [
+        ...old,
+        {
+          id: `temp-${Date.now()}`,
+          account_id: newBudget.accountId,
+          budget_type: newBudget.budgetType,
+          fixed_amount: newBudget.fixedAmount,
+          start_date: newBudget.startDate,
+          end_date: newBudget.endDate,
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          user_id: "",
+        } as Budget
+      ]);
+      
+      return { previous };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["budgets"], context.previous);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["budgets"] });
     },
   });
@@ -102,10 +130,26 @@ export function useBudgets() {
     },
   });
 
-  // Delete budget mutation
+  // Delete budget mutation with optimistic updates
   const { mutateAsync: deleteBudgetMutation } = useMutation({
     mutationFn: serverDeleteBudget,
-    onSuccess: () => {
+    onMutate: async (budgetId: string) => {
+      await queryClient.cancelQueries({ queryKey: ["budgets"] });
+      const previous = queryClient.getQueryData(["budgets"]);
+      
+      // Optimistically remove budget
+      queryClient.setQueryData(["budgets"], (old: Budget[] = []) =>
+        old.filter(b => b.id !== budgetId)
+      );
+      
+      return { previous };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["budgets"], context.previous);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["budgets"] });
     },
   });

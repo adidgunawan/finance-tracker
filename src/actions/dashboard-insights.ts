@@ -103,7 +103,8 @@ async function fetchDashboardInsightsInternal(userId: string): Promise<Dashboard
     previousTransactionsResult,
     currentLinesResult,
     assetLinesResult,
-    recentTransactionsResult
+    recentTransactionsResult,
+    allAccountsResult // ⭐ NEW: Fetch all accounts upfront to prevent N+1
   ] = await Promise.all([
     // Current Month Transactions (for Summary & Trend)
     supabase
@@ -130,13 +131,12 @@ async function fetchDashboardInsightsInternal(userId: string): Promise<Dashboard
         transaction:transactions!inner(currency, transaction_date),
         account:chart_of_accounts!inner(id, name, type, currency, level, parent_id)
       `)
-      .gt("transaction.transaction_date", subDays(currentMonthStart, 1).toISOString()) // Optimization hint?
+      .gt("transaction.transaction_date", subDays(currentMonthStart, 1).toISOString())
       .gte("transaction.transaction_date", currentMonthStart.toISOString().split("T")[0])
       .lte("transaction.transaction_date", currentMonthEnd.toISOString().split("T")[0])
       .in("account.type", ["expense", "income"]),
 
     // All Lines for Asset Accounts (for Total Balance / Net Worth)
-    // Note: We only need asset accounts.
     supabase
       .from("transaction_lines")
       .select(`
@@ -145,8 +145,7 @@ async function fetchDashboardInsightsInternal(userId: string): Promise<Dashboard
         account:chart_of_accounts!inner(type, currency)
       `)
       .eq("account.type", "asset")
-      .eq("account.user_id", userId), // Ensure it filters by user via join implicitly or explicitly? inner join on account filters by user if account has user_id, but safer to check.
-      // Actually chart_of_accounts has user_id.
+      .eq("account.user_id", userId),
     
     // Recent Transactions
     supabase
@@ -155,8 +154,15 @@ async function fetchDashboardInsightsInternal(userId: string): Promise<Dashboard
       .eq("user_id", userId)
       .order("transaction_date", { ascending: false })
       .order("created_at", { ascending: false })
-      .limit(10)
+      .limit(10),
+    
+    // ⭐ All Accounts (for hierarchy traversal without N+1 queries)
+    supabase
+      .from("chart_of_accounts")
+      .select("id, name, level, parent_id, type")
+      .eq("user_id", userId)
   ]);
+
 
   const currentTransactions = (currentTransactionsResult.data || []) as Transaction[];
   // Cast previous transactions slightly loosely as we selected fewer columns
@@ -164,6 +170,8 @@ async function fetchDashboardInsightsInternal(userId: string): Promise<Dashboard
   const breakdownLines = (currentLinesResult.data || []) as unknown as TransactionLine[];
   const assetLines = (assetLinesResult.data || []) as unknown as { debit_amount: number | null; credit_amount: number | null; account: { currency: string | null } }[];
   const recentTransactions = (recentTransactionsResult.data || []) as Transaction[];
+  const allAccounts = (allAccountsResult.data || []) as { id: string; name: string; level: number; parent_id: string | null; type: string }[];
+
 
   // --- PROCESSING: SUMMARY CARDS ---
 
@@ -214,70 +222,40 @@ async function fetchDashboardInsightsInternal(userId: string): Promise<Dashboard
   const totalBalance = convertedBalances.reduce((sum, val) => sum + val, 0);
 
 
+
   // --- PROCESSING: BREAKDOWNS ---
-  // Build account hierarchy map to find level 1 parents
-  const accountHierarchyMap = new Map<string, { id: string; name: string; level: number; parent_id: string | null }>();
   
-  for (const line of breakdownLines) {
-    if (!line.account) continue;
-    const acc = line.account as any;
-    if (!accountHierarchyMap.has(acc.id)) {
-      accountHierarchyMap.set(acc.id, {
-        id: acc.id,
-        name: acc.name,
-        level: acc.level,
-        parent_id: acc.parent_id
-      });
-    }
+  // ⭐ PERFORMANCE FIX: Build complete account hierarchy map upfront
+  // This eliminates N+1 queries (was 100-300 sequential DB calls)
+  const accountMap = new Map<string, { id: string; name: string; level: number; parent_id: string | null }>();
+  
+  for (const account of allAccounts) {
+    accountMap.set(account.id, {
+      id: account.id,
+      name: account.name,
+      level: account.level,
+      parent_id: account.parent_id
+    });
   }
 
-  // Function to find level 1 parent account
-  const findLevel1Parent = async (accountId: string): Promise<{ id: string; name: string } | null> => {
-    const account = accountHierarchyMap.get(accountId);
-    if (!account) return null;
+  // ⭐ SYNCHRONOUS function - no DB calls, O(log n) complexity
+  const findLevel1Parent = (accountId: string): { id: string; name: string } | null => {
+    let current = accountMap.get(accountId);
+    if (!current) return null;
     
-    if (account.level === 1) {
-      return { id: account.id, name: account.name };
+    // Traverse up the hierarchy until we find level 1
+    while (current && current.level > 1 && current.parent_id) {
+      const parent = accountMap.get(current.parent_id);
+      if (!parent) break;
+      current = parent;
     }
     
-    // Need to fetch parent accounts if not in map
-    if (account.parent_id) {
-      let parent = accountHierarchyMap.get(account.parent_id);
-      
-      // If parent not in map, fetch it
-      if (!parent) {
-        const { data } = await supabase
-          .from("chart_of_accounts")
-          .select("id, name, level, parent_id")
-          .eq("id", account.parent_id)
-          .single();
-        
-        if (data) {
-          parent = {
-            id: data.id,
-            name: data.name,
-            level: data.level,
-            parent_id: data.parent_id
-          };
-          accountHierarchyMap.set(data.id, parent);
-        }
-      }
-      
-      if (parent) {
-        if (parent.level === 1) {
-          return { id: parent.id, name: parent.name };
-        } else if (parent.parent_id) {
-          // Recursively find level 1
-          return findLevel1Parent(parent.id);
-        }
-      }
-    }
-    
-    return null;
+    return current?.level === 1 ? { id: current.id, name: current.name } : null;
   };
 
   // We use breakdownLines which are transaction_lines linked to expense/income accounts
   // Unlike transactions table, these have the category (account name).
+
  
   // Group by category (Account Name) - now using level 1 parent
   const expenseMap = new Map<string, number>(); // Name -> Amount (in Base)
@@ -296,7 +274,7 @@ async function fetchDashboardInsightsInternal(userId: string): Promise<Dashboard
     // Find level 1 parent for expense accounts
     let categoryName = acc.name;
     if (acc.type === "expense") {
-      const level1Parent = await findLevel1Parent(acc.id);
+      const level1Parent = findLevel1Parent(acc.id); // ⭐ Now synchronous - no await
       if (level1Parent) {
         categoryName = level1Parent.name;
       }

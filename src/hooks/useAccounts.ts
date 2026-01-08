@@ -40,7 +40,31 @@ export function useAccounts() {
 
   const { mutateAsync: addAccountMutation } = useMutation({
     mutationFn: createAccount,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['accounts'] }),
+    onMutate: async (newAccount) => {
+      await queryClient.cancelQueries({ queryKey: ['accounts'] });
+      const previous = queryClient.getQueryData(['accounts']);
+      
+      // Optimistically add new account
+      queryClient.setQueryData(['accounts'], (old: Account[] = []) => [
+        ...old,
+        {
+          id: `temp-${Date.now()}`,
+          ...newAccount,
+          user_id: "",
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        } as Account
+      ]);
+      
+      return { previous };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['accounts'], context.previous);
+      }
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['accounts'] }),
   });
 
   const { mutateAsync: editAccountMutation } = useMutation({
@@ -50,7 +74,23 @@ export function useAccounts() {
 
   const { mutateAsync: removeAccountMutation } = useMutation({
     mutationFn: deleteAccount,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['accounts'] }),
+    onMutate: async (accountId: string) => {
+      await queryClient.cancelQueries({ queryKey: ['accounts'] });
+      const previous = queryClient.getQueryData(['accounts']);
+      
+      // Optimistically remove account
+      queryClient.setQueryData(['accounts'], (old: Account[] = []) =>
+        old.filter(a => a.id !== accountId)
+      );
+      
+      return { previous };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['accounts'], context.previous);
+      }
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['accounts'] }),
   });
 
   // Wrappers to match existing API

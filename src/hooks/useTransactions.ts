@@ -24,32 +24,44 @@ type Transaction = Database["public"]["Tables"]["transactions"]["Row"] & {
   transaction_attachments?: any[];
 };
 
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 
 export function useTransactions() {
   const queryClient = useQueryClient();
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
   
+  // ⭐ INFINITE SCROLL: Use useInfiniteQuery instead of pagination
   const { 
-    data: queryResult,
+    data,
     isLoading: loading, 
-    error: queryError 
-  } = useQuery({
-    queryKey: ['transactions', page, pageSize],
-    queryFn: async () => {
-      return await getTransactions(page, pageSize);
+    error: queryError,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage
+  } = useInfiniteQuery({
+    queryKey: ['transactions'],
+    queryFn: async ({ pageParam = 1 }) => {
+      return await getTransactions(pageParam, 20);
     },
-     // Cache for 30 minutes, don't refetch on window focus
-     staleTime: 5 * 60 * 1000,
-     placeholderData: keepPreviousData,
+    getNextPageParam: (lastPage, allPages) => {
+      const totalPages = Math.ceil((lastPage.count || 0) / 20);
+      const currentPage = allPages.length;
+      return currentPage < totalPages ? currentPage + 1 : undefined;
+    },
+    initialPageParam: 1,
+    staleTime: 5 * 60 * 1000,
   });
 
-  const transactions = queryResult?.data || [];
-  const totalCount = queryResult?.count || 0;
-  const totalPages = Math.ceil(totalCount / pageSize);
+  // Flatten all pages into single array
+  const transactions = data?.pages.flatMap(page => page.data) || [];
+  const totalCount = data?.pages[0]?.count || 0;
+  const totalPages = Math.ceil(totalCount / 20);
+  const currentPage = data?.pages.length || 1;
 
   const error = queryError instanceof Error ? queryError.message : (queryError ? "Failed to fetch" : null);
+
+  // Legacy compatibility - expose page/setPage for components that still use it
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   // Legacy fetch function needed for refresh button (exposed as refreshTransactions)
   const fetchTransactions = () => queryClient.invalidateQueries({ queryKey: ['transactions'] });
@@ -208,29 +220,70 @@ export function useTransactions() {
       assetAccountId
     );
 
-    const transaction = await serverCreateTransactionWithItems({
+    // ⭐ OPTIMISTIC UPDATE: Create temporary transaction
+    const tempId = `temp-${Date.now()}`;
+    const optimisticTransaction = {
+      id: tempId,
       transaction_date: date,
-      type: "expense",
+      type: "expense" as const,
       description: mainDescription,
       amount: totalAmount,
-      payee_payer: payee,
-      transaction_id: transactionId,
+      payee_payer: payee || null,
+      transaction_id: transactionId || null,
       currency,
       exchange_rate: exchangeRate,
-      lines,
-      lineItems: lineItems.map((item) => ({
-        description: item.description,
-        amount: item.amount,
-        expense_account_id: item.expenseAccountId,
-      })),
+      user_id: "", // Will be set by server
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      attachment_filename: null,
+      attachment_url: null,
+    };
+
+    // Cancel outgoing refetches
+    await queryClient.cancelQueries({ queryKey: ['transactions'] });
+    
+    // Snapshot previous value
+    const previousData = queryClient.getQueryData(['transactions', page, pageSize]);
+    
+    // Optimistically update cache
+    queryClient.setQueryData(['transactions', page, pageSize], (old: any) => {
+      if (!old) return old;
+      return {
+        data: [optimisticTransaction, ...old.data],
+        count: old.count + 1
+      };
     });
 
-    if (attachmentIds && attachmentIds.length > 0 && transaction?.id) {
-        await linkAttachmentsToTransaction(transaction.id, attachmentIds);
-    }
+    try {
+      const transaction = await serverCreateTransactionWithItems({
+        transaction_date: date,
+        type: "expense",
+        description: mainDescription,
+        amount: totalAmount,
+        payee_payer: payee,
+        transaction_id: transactionId,
+        currency,
+        exchange_rate: exchangeRate,
+        lines,
+        lineItems: lineItems.map((item) => ({
+          description: item.description,
+          amount: item.amount,
+          expense_account_id: item.expenseAccountId,
+        })),
+      });
 
-    await queryClient.invalidateQueries({ queryKey: ['transactions'] });
-    return transaction;
+      if (attachmentIds && attachmentIds.length > 0 && transaction?.id) {
+        await linkAttachmentsToTransaction(transaction.id, attachmentIds);
+      }
+
+      // Background revalidation
+      await queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      return transaction;
+    } catch (error) {
+      // Rollback on error
+      queryClient.setQueryData(['transactions', page, pageSize], previousData);
+      throw error;
+    }
   };
 
   const createTransfer = async (
@@ -285,9 +338,27 @@ export function useTransactions() {
       transaction_id?: string;
     }
   ) => {
-      const existing = transactions.find((t) => t.id === id);
-      if (!existing) throw new Error("Transaction not found");
+    const existing = transactions.find((t) => t.id === id);
+    if (!existing) throw new Error("Transaction not found");
 
+    // ⭐ OPTIMISTIC UPDATE
+    await queryClient.cancelQueries({ queryKey: ['transactions'] });
+    const previousData = queryClient.getQueryData(['transactions', page, pageSize]);
+    
+    // Optimistically update cache
+    queryClient.setQueryData(['transactions', page, pageSize], (old: any) => {
+      if (!old) return old;
+      return {
+        ...old,
+        data: old.data.map((t: any) => 
+          t.id === id 
+            ? { ...t, ...data, updated_at: new Date().toISOString() }
+            : t
+        )
+      };
+    });
+
+    try {
       const updated = await serverUpdateTransaction(id, {
         transaction_date: data.transaction_date,
         description: data.description,
@@ -298,11 +369,35 @@ export function useTransactions() {
 
       await queryClient.invalidateQueries({ queryKey: ['transactions'] });
       return updated;
+    } catch (error) {
+      // Rollback on error
+      queryClient.setQueryData(['transactions', page, pageSize], previousData);
+      throw error;
+    }
   };
 
   const deleteTransaction = async (id: string) => {
-    await serverDeleteTransaction(id);
-    await queryClient.invalidateQueries({ queryKey: ['transactions'] });
+    // ⭐ OPTIMISTIC UPDATE
+    await queryClient.cancelQueries({ queryKey: ['transactions'] });
+    const previousData = queryClient.getQueryData(['transactions', page, pageSize]);
+    
+    // Optimistically remove from cache
+    queryClient.setQueryData(['transactions', page, pageSize], (old: any) => {
+      if (!old) return old;
+      return {
+        data: old.data.filter((t: any) => t.id !== id),
+        count: old.count - 1
+      };
+    });
+
+    try {
+      await serverDeleteTransaction(id);
+      await queryClient.invalidateQueries({ queryKey: ['transactions'] });
+    } catch (error) {
+      // Rollback on error
+      queryClient.setQueryData(['transactions', page, pageSize], previousData);
+      throw error;
+    }
   };
 
   return {
@@ -318,12 +413,16 @@ export function useTransactions() {
     updateTransaction,
     deleteTransaction,
     refreshTransactions: fetchTransactions,
-    // Pagination
-    page,
+    // Pagination (legacy compatibility)
+    page: currentPage,
     setPage,
     pageSize,
     setPageSize,
     totalCount,
     totalPages,
+    // ⭐ Infinite scroll
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
   };
 }
