@@ -101,7 +101,7 @@ export function CSVTransactionRow({
           {format(new Date(csvTransaction.date), "MMM d, yyyy")}
         </TableCell>
         <TableCell>
-          <div className="max-w-md truncate" title={csvTransaction.description}>
+          <div className="max-w-md break-words">
             {csvTransaction.description}
           </div>
         </TableCell>

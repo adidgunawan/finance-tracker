@@ -28,8 +28,48 @@ export const getTransactionsByCategory = async (categoryName: string): Promise<D
   const currentMonthStart = startOfMonth(now);
   const currentMonthEnd = endOfMonth(now);
 
-  // We need to find transactions where the expense account name matches the categoryName
-  // We query transaction_lines -> chart_of_accounts
+  // First, find the account by name (could be level 1 or any level)
+  const { data: accountData, error: accountError } = await supabase
+    .from("chart_of_accounts")
+    .select("id, name, level, parent_id, type")
+    .eq("user_id", userId)
+    .eq("name", categoryName)
+    .eq("type", "expense")
+    .maybeSingle();
+
+  if (accountError) {
+    console.error("Error fetching account:", accountError);
+    throw new Error(accountError.message);
+  }
+
+  if (!accountData) {
+    // No account found with this name
+    return [];
+  }
+
+  // Now find all child accounts recursively
+  const accountIds = [accountData.id];
+  
+  // Function to recursively find all children
+  const findChildren = async (parentId: string) => {
+    const { data: children } = await supabase
+      .from("chart_of_accounts")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("parent_id", parentId);
+    
+    if (children && children.length > 0) {
+      for (const child of children) {
+        accountIds.push(child.id);
+        await findChildren(child.id); // Recursively find grandchildren
+      }
+    }
+  };
+
+  // Find all descendants
+  await findChildren(accountData.id);
+
+  // Now query transactions for all these accounts
   const { data, error } = await supabase
     .from("transaction_lines")
     .select(`
@@ -46,9 +86,7 @@ export const getTransactionsByCategory = async (categoryName: string): Promise<D
         type
       )
     `)
-    .eq("account.user_id", userId)
-    .eq("account.type", "expense")
-    .eq("account.name", categoryName)
+    .in("account_id", accountIds)
     .gte("transaction.transaction_date", currentMonthStart.toISOString().split("T")[0])
     .lte("transaction.transaction_date", currentMonthEnd.toISOString().split("T")[0]);
 

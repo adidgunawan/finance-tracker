@@ -5,7 +5,6 @@ import { ExpenseBreakdown } from "@/components/dashboard/ExpenseBreakdown";
 import { IncomeBreakdown } from "@/components/dashboard/IncomeBreakdown";
 import { DailyTrendChart } from "@/components/dashboard/DailyTrendChart";
 import { MonthlyComparisonChart } from "@/components/dashboard/MonthlyComparisonChart";
-import { DashboardTransactionTable } from "@/components/dashboard/DashboardTransactionTable";
 import { Skeleton } from "@/components/ui/skeleton";
 
 function DashboardSkeleton() {
@@ -71,8 +70,6 @@ export default async function DashboardPage() {
         <ExpenseBreakdown data={data.expenseBreakdown} />
         <IncomeBreakdown data={data.incomeBreakdown} />
       </div>
-
-      <DashboardTransactionTable transactions={data.recentTransactions} />
     </div>
   );
 }
