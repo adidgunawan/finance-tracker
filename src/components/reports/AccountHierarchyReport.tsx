@@ -13,6 +13,19 @@ import { useCurrency } from "@/hooks/useCurrency";
 import { useCurrencyConversion } from "@/hooks/useCurrencyConversion";
 import type { AccountHierarchyItem } from "@/actions/reports";
 
+// Recursively calculate total balance including all children
+function calculateAccountTotal(account: AccountHierarchyItem): number {
+  let total = account.converted_balance ?? account.balance ?? 0;
+  
+  if (account.children && account.children.length > 0) {
+    account.children.forEach((child) => {
+      total += calculateAccountTotal(child);
+    });
+  }
+  
+  return total;
+}
+
 interface AccountHierarchyReportProps {
   data: AccountHierarchyItem[];
 }
@@ -93,6 +106,13 @@ function AccountTypeGroup({ type, label, accounts }: AccountTypeGroupProps) {
     }, 0);
   }, [accounts]);
 
+  // Calculate grand total including all children
+  const grandTotal = useMemo(() => {
+    return accounts.reduce((sum, account) => {
+      return sum + calculateAccountTotal(account);
+    }, 0);
+  }, [accounts]);
+
   const { format: formatCurrency } = useCurrency();
 
   return (
@@ -128,6 +148,32 @@ function AccountTypeGroup({ type, label, accounts }: AccountTypeGroupProps) {
             {accounts.map((account) => (
               <AccountNode key={account.account_id} account={account} />
             ))}
+            
+            {/* Grand Total for Account Type */}
+            <div className="flex items-center gap-2 px-3 py-3 rounded-md bg-primary/10 border-t-2 border-primary mt-2">
+              <div className="flex-shrink-0 w-4 h-4" />
+              
+              <div className="flex-1 flex items-center justify-between">
+                <div>
+                  <span className="text-base text-foreground font-bold">
+                    Grand Total - {label}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-4 text-sm">
+                  <div className="text-right">
+                    <div className="text-muted-foreground font-semibold">Total</div>
+                    <div
+                      className={`font-bold text-lg ${
+                        grandTotal >= 0 ? "text-primary" : "text-destructive"
+                      }`}
+                    >
+                      {formatCurrency(Math.abs(grandTotal))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </CollapsibleContent>
       </Collapsible>
@@ -146,6 +192,14 @@ function AccountNode({ account }: AccountNodeProps) {
   const hasChildren = account.children && account.children.length > 0;
 
   const showConversion = account.currency && account.currency !== baseCurrency && account.converted_balance !== undefined;
+
+  // Calculate grand total for level 1 accounts
+  const grandTotal = useMemo(() => {
+    if (account.level === 1 && hasChildren) {
+      return calculateAccountTotal(account);
+    }
+    return null;
+  }, [account]);
 
   return (
     <div>
@@ -210,6 +264,37 @@ function AccountNode({ account }: AccountNodeProps) {
           {account.children!.map((child) => (
             <AccountNode key={child.account_id} account={child} />
           ))}
+          
+          {/* Grand Total for Level 1 Accounts */}
+          {account.level === 1 && grandTotal !== null && (
+            <div
+              className="flex items-center gap-2 px-3 py-2 rounded-md bg-accent/50 border-t-2 border-border mt-1"
+              style={{ paddingLeft: `${(account.level - 1) * 24}px` }}
+            >
+              <div className="flex-shrink-0 w-4 h-4" />
+              
+              <div className="flex-1 flex items-center justify-between">
+                <div>
+                  <span className="text-sm text-foreground font-bold">
+                    Grand Total - {account.account_name}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-4 text-sm">
+                  <div className="text-right">
+                    <div className="text-muted-foreground font-semibold">Total</div>
+                    <div
+                      className={`font-bold text-base ${
+                        grandTotal >= 0 ? "text-primary" : "text-destructive"
+                      }`}
+                    >
+                      {formatCurrency(Math.abs(grandTotal))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

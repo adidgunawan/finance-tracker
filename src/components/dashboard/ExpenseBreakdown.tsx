@@ -82,7 +82,7 @@ export function ExpenseBreakdown({ data }: ExpenseBreakdownProps) {
             <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
               <Pie
                 data={chartData}
-                cx="50%"
+                cx={isMobile ? "50%" : "25%"}
                 cy={isMobile ? "40%" : "50%"}
                 innerRadius={isMobile ? 50 : 60}
                 outerRadius={isMobile ? 70 : 80}
@@ -118,13 +118,13 @@ export function ExpenseBreakdown({ data }: ExpenseBreakdownProps) {
                  layout={isMobile ? "horizontal" : "vertical"}
                  verticalAlign={isMobile ? "bottom" : "middle"}
                  align={isMobile ? "center" : "right"}
-                 wrapperStyle={isMobile ? { bottom: 0, left: 0, right: 0, padding: '0 10px 10px 10px' } : { paddingRight: '20px' }}
+                 wrapperStyle={isMobile ? { bottom: 0, left: 0, right: 0, padding: '0 10px 10px 10px' } : { paddingRight: '10px', paddingLeft: '0px' }}
                  content={({ payload }) => (
                    <div className={cn(
                      "overflow-y-auto custom-scrollbar",
                      isMobile 
                        ? "flex flex-wrap justify-center gap-x-4 gap-y-2 max-h-[120px] w-full pt-4" 
-                       : "flex flex-col gap-2 max-h-[300px] pr-2"
+                       : "flex flex-col gap-2 max-h-[300px] pr-2 min-w-[380px]"
                    )}>
                      {payload?.map((entry: any, index: number) => {
                        const item = chartData.find(d => d.category === entry.value);
@@ -143,7 +143,7 @@ export function ExpenseBreakdown({ data }: ExpenseBreakdownProps) {
                                 className="w-2.5 h-2.5 rounded-full flex-shrink-0" 
                                 style={{ backgroundColor: entry.color }}
                               />
-                              <span className="text-muted-foreground font-medium truncate max-w-[90px]" title={item.category}>
+                              <span className="text-muted-foreground font-medium truncate max-w-[200px]" title={item.category}>
                                 {item.category}
                               </span>
                             </div>

@@ -20,7 +20,7 @@ import { unstable_cache } from "next/cache";
 type Transaction = Database["public"]["Tables"]["transactions"]["Row"];
 type TransactionLine = Database["public"]["Tables"]["transaction_lines"]["Row"] & {
   transaction: Pick<Transaction, "currency" | "transaction_date"> | null;
-  account: Pick<Database["public"]["Tables"]["chart_of_accounts"]["Row"], "name" | "type" | "currency"> | null;
+  account: Pick<Database["public"]["Tables"]["chart_of_accounts"]["Row"], "id" | "name" | "type" | "currency" | "level" | "parent_id"> | null;
 };
 
 export interface DashboardInsights {
@@ -128,7 +128,7 @@ async function fetchDashboardInsightsInternal(userId: string): Promise<Dashboard
         debit_amount, 
         credit_amount, 
         transaction:transactions!inner(currency, transaction_date),
-        account:chart_of_accounts!inner(name, type, currency)
+        account:chart_of_accounts!inner(id, name, type, currency, level, parent_id)
       `)
       .gt("transaction.transaction_date", subDays(currentMonthStart, 1).toISOString()) // Optimization hint?
       .gte("transaction.transaction_date", currentMonthStart.toISOString().split("T")[0])
@@ -215,10 +215,71 @@ async function fetchDashboardInsightsInternal(userId: string): Promise<Dashboard
 
 
   // --- PROCESSING: BREAKDOWNS ---
+  // Build account hierarchy map to find level 1 parents
+  const accountHierarchyMap = new Map<string, { id: string; name: string; level: number; parent_id: string | null }>();
+  
+  for (const line of breakdownLines) {
+    if (!line.account) continue;
+    const acc = line.account as any;
+    if (!accountHierarchyMap.has(acc.id)) {
+      accountHierarchyMap.set(acc.id, {
+        id: acc.id,
+        name: acc.name,
+        level: acc.level,
+        parent_id: acc.parent_id
+      });
+    }
+  }
+
+  // Function to find level 1 parent account
+  const findLevel1Parent = async (accountId: string): Promise<{ id: string; name: string } | null> => {
+    const account = accountHierarchyMap.get(accountId);
+    if (!account) return null;
+    
+    if (account.level === 1) {
+      return { id: account.id, name: account.name };
+    }
+    
+    // Need to fetch parent accounts if not in map
+    if (account.parent_id) {
+      let parent = accountHierarchyMap.get(account.parent_id);
+      
+      // If parent not in map, fetch it
+      if (!parent) {
+        const { data } = await supabase
+          .from("chart_of_accounts")
+          .select("id, name, level, parent_id")
+          .eq("id", account.parent_id)
+          .single();
+        
+        if (data) {
+          parent = {
+            id: data.id,
+            name: data.name,
+            level: data.level,
+            parent_id: data.parent_id
+          };
+          accountHierarchyMap.set(data.id, parent);
+        }
+      }
+      
+      if (parent) {
+        if (parent.level === 1) {
+          return { id: parent.id, name: parent.name };
+        } else if (parent.parent_id) {
+          // Recursively find level 1
+          return findLevel1Parent(parent.id);
+        }
+      }
+    }
+    
+    return null;
+  };
+
   // We use breakdownLines which are transaction_lines linked to expense/income accounts
   // Unlike transactions table, these have the category (account name).
  
-  // Group by category (Account Name)
+  // Group by category (Account Name) - now using level 1 parent
   const expenseMap = new Map<string, number>(); // Name -> Amount (in Base)
   const incomeMap = new Map<string, number>();
 
@@ -230,20 +291,31 @@ async function fetchDashboardInsightsInternal(userId: string): Promise<Dashboard
   for (const line of breakdownLines) {
     if (!line.account || !line.transaction) continue;
     
+    const acc = line.account as any;
+    
+    // Find level 1 parent for expense accounts
+    let categoryName = acc.name;
+    if (acc.type === "expense") {
+      const level1Parent = await findLevel1Parent(acc.id);
+      if (level1Parent) {
+        categoryName = level1Parent.name;
+      }
+    }
+    
     // Use transaction currency as the currency of the amount (standard double entry assumption in this app)
     const currency = line.transaction.currency || baseCurrency;
     // For Expense Accounts: Debit increases expense
     // For Income Accounts: Credit increases income
     
-    if (line.account.type === "expense") {
+    if (acc.type === "expense") {
       const amount = (line.debit_amount || 0) - (line.credit_amount || 0); // Net Expense
       if (amount !== 0) {
-        expenseItemsToConvert.push({ amount, currency, category: line.account.name });
+        expenseItemsToConvert.push({ amount, currency, category: categoryName });
       }
-    } else if (line.account.type === "income") {
+    } else if (acc.type === "income") {
        const amount = (line.credit_amount || 0) - (line.debit_amount || 0); // Net Income
        if (amount !== 0) {
-        incomeItemsToConvert.push({ amount, currency, category: line.account.name });
+        incomeItemsToConvert.push({ amount, currency, category: categoryName });
        }
     }
   }
